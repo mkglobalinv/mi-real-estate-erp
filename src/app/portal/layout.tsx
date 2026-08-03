@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import LogoutButton from '@/components/LogoutButton';
 import UserMenu from '@/components/UserMenu';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
 import { 

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
+import LogoutButton from '@/components/LogoutButton';
 import UserMenu from '@/components/UserMenu';
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
@@ -237,6 +238,9 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex-1">
             <p className="text-sm font-bold text-white leading-tight">{userName || 'Loading...'}</p>
             <p className="text-[11px] text-[var(--color-primary)] font-medium uppercase tracking-wider">{role}</p>
+          </div>
+          <div className="ml-2">
+            <LogoutButton className="text-gray-400 hover:text-red-400 bg-gray-800 p-2 rounded-lg hover:bg-gray-700" />
           </div>
         </div>
       </aside>
