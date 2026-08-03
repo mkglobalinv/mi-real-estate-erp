@@ -11,7 +11,6 @@ export default function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
   const router = useRouter();
   
   // Close the menu when clicking outside
@@ -31,6 +30,7 @@ export default function UserMenu() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
+      const supabase = createClient();
       await supabase.auth.signOut();
       // Force a full window reload to clear all React state, Apollo caches, 
       // and RoleProvider state, redirecting to login.

@@ -5,20 +5,20 @@ import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
 
 // We use the browser client for the UI data layer
-const supabase = createClient();
+const getSupabase = () => createClient();
 
 export const api = {
 
   // --- PROPERTIES ---
   async getProperties(): Promise<PropertyListing[]> {
-    const { data, error } = await supabase.from('properties').select('*');
+    const { data, error } = await getSupabase().from('properties').select('*');
     if (error) throw new Error(`Supabase error: ${error.message}`);
     if (data) return data.map(mapDbToProperty);
     return [];
   },
 
   async getPropertyById(id: string): Promise<PropertyListing | null> {
-    const { data, error } = await supabase.from('properties').select('*').or(`id.eq.${id},ref.eq.${id}`).maybeSingle();
+    const { data, error } = await getSupabase().from('properties').select('*').or(`id.eq.${id},ref.eq.${id}`).maybeSingle();
     if (error) return null;
     if (data) return mapDbToProperty(data);
     return null;
@@ -29,21 +29,21 @@ export const api = {
         property.ref = generatePropertyRef(Math.floor(Math.random() * 1000));
     }
     const mapped = mapPropertyToDb(property);
-    const { data, error } = await supabase.from('properties').upsert(mapped).select().single();
+    const { data, error } = await getSupabase().from('properties').upsert(mapped).select().single();
     if (error) throw new Error(`Supabase error: ${error.message}`);
     return mapDbToProperty(data);
   },
 
   // --- PROJECTS ---
   async getProjects(): Promise<Project[]> {
-    const { data, error } = await supabase.from('projects').select('*');
+    const { data, error } = await getSupabase().from('projects').select('*');
     if (error) throw new Error(`Supabase error: ${error.message}`);
     if (data) return data.map(mapDbToProject);
     return [];
   },
 
   async saveProject(proj: Partial<Project>): Promise<Project> {
-    const { data, error } = await supabase.from('projects').upsert(proj).select().single();
+    const { data, error } = await getSupabase().from('projects').upsert(proj).select().single();
     if (error) throw new Error(`Supabase error: ${error.message}`);
     return mapDbToProject(data);
   },
@@ -51,7 +51,7 @@ export const api = {
   // --- LEADS ---
   async getLeads(): Promise<Lead[]> {
     try {
-      const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('leads').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToLead);
       return [];
@@ -83,13 +83,13 @@ export const api = {
       data.status = 'New';
 
       if (!data.id && !data.ref) {
-        const { count, error: countErr } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await getSupabase().from('leads').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         data.ref = generateLeadRef((count || 0) + 1);
       }
 
       const mapped = mapLeadToDb(data);
-      const { data: dbData, error } = await supabase.from('leads').upsert(mapped).select().single();
+      const { data: dbData, error } = await getSupabase().from('leads').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToLead(dbData);
     } catch (err) {
@@ -101,7 +101,7 @@ export const api = {
 
   
   async updateLeadAssignment(id: string, assignedTo: string, notes: string, followUpDate: string): Promise<void> {
-    const { error } = await supabase.from('leads').update({ 
+    const { error } = await getSupabase().from('leads').update({ 
       assigned_to: assignedTo, 
       notes: notes, 
       follow_up_date: followUpDate,
@@ -113,7 +113,7 @@ export const api = {
   // --- CUSTOMERS ---
   async getCustomers(): Promise<Customer[]> {
     try {
-      const { data, error } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('customers').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToCustomer);
       return [];
@@ -126,13 +126,13 @@ export const api = {
   async saveCustomer(customer: Partial<Customer>): Promise<Customer> {
     try {
       if (!customer.id && !customer.ref) {
-        const { count, error: countErr } = await supabase.from('customers').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await getSupabase().from('customers').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         customer.ref = generateCustomerRef((count || 0) + 1);
       }
       
       const mapped = mapCustomerToDb(customer);
-      const { data, error } = await supabase.from('customers').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('customers').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToCustomer(data);
     } catch (err) {
@@ -144,7 +144,7 @@ export const api = {
   // --- EASY BUY ACCOUNTS ---
   async getEasyBuyAccounts(): Promise<EasyBuyAccount[]> {
     try {
-      const { data, error } = await supabase.from('easy_buy_accounts').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('easy_buy_accounts').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToEasyBuyAccount);
       return [];
@@ -157,13 +157,13 @@ export const api = {
   async saveEasyBuyAccount(account: Partial<EasyBuyAccount>): Promise<EasyBuyAccount> {
     try {
       if (!account.id && !account.ref) {
-        const { count, error: countErr } = await supabase.from('easy_buy_accounts').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await getSupabase().from('easy_buy_accounts').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         account.ref = generateEasyBuyRef((count || 0) + 1);
       }
 
       const mapped = mapEasyBuyAccountToDb(account);
-      const { data, error } = await supabase.from('easy_buy_accounts').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('easy_buy_accounts').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToEasyBuyAccount(data);
     } catch (err) {
@@ -175,7 +175,7 @@ export const api = {
   // --- INSTALLMENTS ---
   async getInstallments(): Promise<Installment[]> {
     try {
-      const { data, error } = await supabase.from('installments').select('*').order('due_date', { ascending: true });
+      const { data, error } = await getSupabase().from('installments').select('*').order('due_date', { ascending: true });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToInstallment);
       return [];
@@ -188,7 +188,7 @@ export const api = {
   async saveInstallment(installment: Partial<Installment>): Promise<Installment> {
     try {
       const mapped = mapInstallmentToDb(installment);
-      const { data, error } = await supabase.from('installments').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('installments').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToInstallment(data);
     } catch (err) {
@@ -200,7 +200,7 @@ export const api = {
   // --- PAYMENT PROOFS & FINANCE ---
   async getPaymentProofs(): Promise<PaymentProof[]> {
     try {
-      const { data, error } = await supabase.from('payment_proofs').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('payment_proofs').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToPaymentProof);
       return [];
@@ -213,7 +213,7 @@ export const api = {
   async savePaymentProof(proof: Partial<PaymentProof>): Promise<PaymentProof> {
     try {
       const mapped = mapPaymentProofToDb(proof);
-      const { data, error } = await supabase.from('payment_proofs').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('payment_proofs').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToPaymentProof(data);
     } catch (err) {
@@ -224,7 +224,7 @@ export const api = {
 
   async getLedgerTransactions(): Promise<LedgerTransaction[]> {
     try {
-      const { data, error } = await supabase.from('ledger_transactions').select('*').order('date', { ascending: false });
+      const { data, error } = await getSupabase().from('ledger_transactions').select('*').order('date', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToLedgerTransaction);
       return [];
@@ -237,7 +237,7 @@ export const api = {
   async saveLedgerTransaction(tx: Partial<LedgerTransaction>): Promise<LedgerTransaction> {
     try {
       const mapped = mapLedgerTransactionToDb(tx);
-      const { data, error } = await supabase.from('ledger_transactions').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('ledger_transactions').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToLedgerTransaction(data);
     } catch (err) {
@@ -248,7 +248,7 @@ export const api = {
 
   async getReceipts(): Promise<Receipt[]> {
     try {
-      const { data, error } = await supabase.from('receipts').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('receipts').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToReceipt);
       return [];
@@ -261,7 +261,7 @@ export const api = {
   async saveReceipt(receipt: Partial<Receipt>): Promise<Receipt> {
     try {
       const mapped = mapReceiptToDb(receipt);
-      const { data, error } = await supabase.from('receipts').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('receipts').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToReceipt(data);
     } catch (err) {
@@ -274,7 +274,7 @@ export const api = {
   async verifyPayment(proofId: string, amount: number, customerId: string, accountId: string, installmentNumber: number, issuedByProfileId: string, customReceiptNumber: string): Promise<void> {
     try {
       // Execute the RPC for atomicity
-      const { error } = await supabase.rpc('verify_payment_transaction', {
+      const { error } = await getSupabase().rpc('verify_payment_transaction', {
         p_proof_id: proofId,
         p_amount: amount,
         p_customer_id: customerId,
@@ -293,7 +293,7 @@ export const api = {
   // --- OPERATIONS (STAGE 3) ---
   async getAllocations(): Promise<Allocation[]> {
     try {
-      const { data, error } = await supabase.from('allocations').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('allocations').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToAllocation);
       return [];
@@ -322,7 +322,7 @@ export const api = {
       }
 
       const mapped = mapAllocationToDb(alloc);
-      const { data, error } = await supabase.from('allocations').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('allocations').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToAllocation(data);
     } catch (err) {
@@ -333,7 +333,7 @@ export const api = {
 
   async getInspections(): Promise<InspectionBooking[]> {
     try {
-      const { data, error } = await supabase.from('inspections').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('inspections').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToInspection);
       return [];
@@ -346,12 +346,12 @@ export const api = {
   async saveInspection(insp: Partial<InspectionBooking>): Promise<InspectionBooking> {
     try {
       if (!insp.id && !insp.ref) {
-        const { count, error: countErr } = await supabase.from('inspections').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await getSupabase().from('inspections').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         insp.ref = generateBookingRef((count || 0) + 1);
       }
       const mapped = mapInspectionToDb(insp);
-      const { data, error } = await supabase.from('inspections').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('inspections').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToInspection(data);
     } catch (err) {
@@ -362,7 +362,7 @@ export const api = {
 
   async getReservations(): Promise<Reservation[]> {
     try {
-      const { data, error } = await supabase.from('reservations').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('reservations').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToReservation);
       return [];
@@ -373,7 +373,7 @@ export const api = {
   },
 
   async getTasks(): Promise<Task[]> {
-    const { data, error } = await supabase.from('tasks').select('*').order('due_date', { ascending: true });
+    const { data, error } = await getSupabase().from('tasks').select('*').order('due_date', { ascending: true });
     if (error) throw new Error(error.message);
     return data ? data.map(mapDbToTask) : [];
   },
@@ -381,12 +381,12 @@ export const api = {
   async saveReservation(res: Partial<Reservation>): Promise<Reservation> {
     try {
       if (!res.id && !res.ref) {
-        const { count, error: countErr } = await supabase.from('reservations').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await getSupabase().from('reservations').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         res.ref = generateReservationRef((count || 0) + 1);
       }
       const mapped = mapReservationToDb(res);
-      const { data, error } = await supabase.from('reservations').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('reservations').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToReservation(data);
     } catch (err) {
@@ -399,11 +399,11 @@ export const api = {
   async processReservation(reservationData: Partial<Reservation>, customerProfileId: string): Promise<void> {
     try {
       if (!reservationData.ref) {
-         const { count } = await supabase.from('reservations').select('*', { count: 'exact', head: true });
+         const { count } = await getSupabase().from('reservations').select('*', { count: 'exact', head: true });
          reservationData.ref = generateReservationRef((count || 0) + 1);
       }
       const mapped = mapReservationToDb(reservationData);
-      const { error } = await supabase.rpc('process_reservation_transaction', {
+      const { error } = await getSupabase().rpc('process_reservation_transaction', {
          p_reservation_data: mapped,
          p_customer_profile_id: customerProfileId
       });
@@ -417,7 +417,7 @@ export const api = {
   // --- CUSTOMER CARE TICKETS ---
   async getCustomerCareTickets(): Promise<CustomerCareTicket[]> {
     try {
-      const { data, error } = await supabase.from('customer_care_tickets').select('*').order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('customer_care_tickets').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToCustomerCareTicket);
       return [];
@@ -430,12 +430,12 @@ export const api = {
   async saveCustomerCareTicket(ticket: Partial<CustomerCareTicket>): Promise<CustomerCareTicket> {
     try {
       if (!ticket.id && !ticket.ref) {
-        const { count, error: countErr } = await supabase.from('customer_care_tickets').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await getSupabase().from('customer_care_tickets').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         ticket.ref = generateTicketRef((count || 0) + 1);
       }
       const mapped = mapCustomerCareTicketToDb(ticket);
-      const { data, error } = await supabase.from('customer_care_tickets').upsert(mapped).select().single();
+      const { data, error } = await getSupabase().from('customer_care_tickets').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToCustomerCareTicket(data);
     } catch (err) {
@@ -447,7 +447,7 @@ export const api = {
   // --- ACTIVITY LOGS & NOTIFICATIONS ---
   async getLogs(): Promise<ActivityLog[]> {
     try {
-      const { data, error } = await supabase.from('activity_logs').select('*, profiles(full_name)').order('created_at', { ascending: false }).limit(100);
+      const { data, error } = await getSupabase().from('activity_logs').select('*, profiles(full_name)').order('created_at', { ascending: false }).limit(100);
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToActivityLog);
       return [];
@@ -460,7 +460,7 @@ export const api = {
   async logActivity(logData: Partial<ActivityLog>): Promise<void> {
     try {
       let userId: string | null = null;
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getSupabase().auth.getUser();
       if (user) {
         userId = user.id;
       }
@@ -471,7 +471,7 @@ export const api = {
         user_id: userId
       };
       
-      const { error } = await supabase.from('activity_logs').insert(dbPayload);
+      const { error } = await getSupabase().from('activity_logs').insert(dbPayload);
       if (error) throw new Error(`Supabase error: ${error.message}`);
     } catch (err) {
       console.error('Failed to log activity', err);
@@ -480,7 +480,7 @@ export const api = {
 
   async getNotifications(userId: string): Promise<Notification[]> {
     try {
-      const { data, error } = await supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+      const { data, error } = await getSupabase().from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
       if (data) return data.map(mapDbToNotification);
       return [];
@@ -492,7 +492,7 @@ export const api = {
 
   async markNotificationRead(id: string): Promise<void> {
     try {
-      const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+      const { error } = await getSupabase().from('notifications').update({ is_read: true }).eq('id', id);
       if (error) throw new Error(`Supabase error: ${error.message}`);
     } catch (err) {
       console.error('Failed to mark notification read', err);
@@ -502,77 +502,77 @@ export const api = {
 
   // --- CAMPAIGNS (PHASE 6) ---
   async getCampaigns(): Promise<Campaign[]> {
-    const { data, error } = await supabase.from('campaigns').select('*, lead_submissions(count), campaign_analytics(count)').order('created_at', { ascending: false });
+    const { data, error } = await getSupabase().from('campaigns').select('*, lead_submissions(count), campaign_analytics(count)').order('created_at', { ascending: false });
     if (!error && data) return data.map(mapDbToCampaign);
     return [];
   },
 
   async getCampaignById(id: string): Promise<Campaign | null> {
-    const { data, error } = await supabase.from('campaigns').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await getSupabase().from('campaigns').select('*').eq('id', id).maybeSingle();
     if (!error && data) return mapDbToCampaign(data);
     return null;
   },
 
   async getCampaignBySlug(slug: string): Promise<Campaign | null> {
-    const { data, error } = await supabase.from('campaigns').select('*').eq('slug', slug).maybeSingle();
+    const { data, error } = await getSupabase().from('campaigns').select('*').eq('slug', slug).maybeSingle();
     if (!error && data) return mapDbToCampaign(data);
     return null;
   },
 
   async saveCampaign(campaign: Partial<Campaign>): Promise<Campaign> {
     const mapped = mapCampaignToDb(campaign);
-    const { data, error } = await supabase.from('campaigns').upsert(mapped).select().single();
+    const { data, error } = await getSupabase().from('campaigns').upsert(mapped).select().single();
     if (error) throw error;
     return mapDbToCampaign(data);
   },
 
   async deleteCampaign(id: string): Promise<void> {
-    const { error } = await supabase.from('campaigns').delete().eq('id', id);
+    const { error } = await getSupabase().from('campaigns').delete().eq('id', id);
     if (error) throw error;
   },
 
   // --- CAMPAIGN QUESTIONS ---
   async getCampaignQuestions(campaignId: string): Promise<CampaignQuestion[]> {
-    const { data, error } = await supabase.from('campaign_questions').select('*').eq('campaign_id', campaignId).order('order_index', { ascending: true });
+    const { data, error } = await getSupabase().from('campaign_questions').select('*').eq('campaign_id', campaignId).order('order_index', { ascending: true });
     if (!error && data) return data.map(mapDbToCampaignQuestion);
     return [];
   },
 
   async saveCampaignQuestion(question: Partial<CampaignQuestion>): Promise<CampaignQuestion> {
     const mapped = mapCampaignQuestionToDb(question);
-    const { data, error } = await supabase.from('campaign_questions').upsert(mapped).select().single();
+    const { data, error } = await getSupabase().from('campaign_questions').upsert(mapped).select().single();
     if (error) throw error;
     return mapDbToCampaignQuestion(data);
   },
 
   async deleteCampaignQuestion(id: string): Promise<void> {
-    const { error } = await supabase.from('campaign_questions').delete().eq('id', id);
+    const { error } = await getSupabase().from('campaign_questions').delete().eq('id', id);
     if (error) throw error;
   },
 
   // --- CAMPAIGN FAQS ---
   async getCampaignFaqs(campaignId: string): Promise<CampaignFaq[]> {
-    const { data, error } = await supabase.from('campaign_faqs').select('*').eq('campaign_id', campaignId).order('order_index', { ascending: true });
+    const { data, error } = await getSupabase().from('campaign_faqs').select('*').eq('campaign_id', campaignId).order('order_index', { ascending: true });
     if (!error && data) return data.map(mapDbToCampaignFaq);
     return [];
   },
 
   async saveCampaignFaq(faq: Partial<CampaignFaq>): Promise<CampaignFaq> {
     const mapped = mapCampaignFaqToDb(faq);
-    const { data, error } = await supabase.from('campaign_faqs').upsert(mapped).select().single();
+    const { data, error } = await getSupabase().from('campaign_faqs').upsert(mapped).select().single();
     if (error) throw error;
     return mapDbToCampaignFaq(data);
   },
 
   async deleteCampaignFaq(id: string): Promise<void> {
-    const { error } = await supabase.from('campaign_faqs').delete().eq('id', id);
+    const { error } = await getSupabase().from('campaign_faqs').delete().eq('id', id);
     if (error) throw error;
   },
 
   // --- EVENT TRACKING & SUBMISSIONS (SUPABASE INTEGRATED) ---
   async trackCampaignEvent(campaignId: string, eventType: string): Promise<void> {
     try {
-      const { error } = await supabase.from('campaign_analytics').insert({
+      const { error } = await getSupabase().from('campaign_analytics').insert({
         campaign_id: campaignId,
         event_type: eventType
       });
@@ -584,7 +584,7 @@ export const api = {
 
   async submitCampaignLead(campaignId: string, leadData: any, answers: any[], scoreData: any): Promise<any> {
     // 1. Save Lead Submission
-    const { data: submissionData, error: subError } = await supabase.from('lead_submissions').insert({
+    const { data: submissionData, error: subError } = await getSupabase().from('lead_submissions').insert({
       campaign_id: campaignId,
       name: leadData.name,
       phone: leadData.phone,
@@ -603,12 +603,12 @@ export const api = {
         question_id: a.questionId,
         answer_text: a.answerText
       }));
-      const { error: ansError } = await supabase.from('lead_answers').insert(answersPayload);
+      const { error: ansError } = await getSupabase().from('lead_answers').insert(answersPayload);
       if (ansError) console.error('Supabase lead_answers error:', ansError);
     }
 
     // 3. Save Score
-    const { error: scoreError } = await supabase.from('lead_scores').insert({
+    const { error: scoreError } = await getSupabase().from('lead_scores').insert({
       lead_id: leadId,
       score: scoreData.score,
       category: scoreData.category
@@ -631,7 +631,7 @@ ${answersSummary}`;
     try {
       // Use standard CRM createLead which might eventually use Supabase
       // For now, mapping explicitly for direct Supabase insert
-      const { error: crmError } = await supabase.from('leads').insert({
+      const { error: crmError } = await getSupabase().from('leads').insert({
         ref: `MIRE-LD-${Date.now().toString().slice(-6)}`,
         name: leadData.name,
         phone: leadData.phone,
@@ -654,7 +654,7 @@ ${answersSummary}`;
   },
 
   async getCampaignAnalyticsEvents(campaignId?: string): Promise<any[]> {
-    let query = supabase.from('campaign_analytics').select('*');
+    let query = getSupabase().from('campaign_analytics').select('*');
     if (campaignId) query = query.eq('campaign_id', campaignId);
     const { data, error } = await query;
     if (!error && data) return data;
@@ -666,35 +666,35 @@ ${answersSummary}`;
   },
 
   async getWebsiteEnquiries(): Promise<WebsiteEnquiry[]> {
-    const { data, error } = await supabase.from('website_enquiries').select('*');
+    const { data, error } = await getSupabase().from('website_enquiries').select('*');
     if (error) throw new Error(error.message);
     return data ? data.map(mapDbToWebsiteEnquiry) : [];
   },
   async submitWebsiteEnquiry(payload: Partial<WebsiteEnquiry>): Promise<WebsiteEnquiry> {
-    const { data, error } = await supabase.from('website_enquiries').insert(mapWebsiteEnquiryToDb(payload)).select().single();
+    const { data, error } = await getSupabase().from('website_enquiries').insert(mapWebsiteEnquiryToDb(payload)).select().single();
     if (error) throw new Error(error.message);
     return mapDbToWebsiteEnquiry(data);
   },
 
   async getAnnouncements(): Promise<Announcement[]> {
-    const { data, error } = await supabase.from('announcements').select('*');
+    const { data, error } = await getSupabase().from('announcements').select('*');
     if (error) throw new Error(error.message);
     return data ? data.map(mapDbToAnnouncement) : [];
   },
   async saveAnnouncement(payload: Partial<Announcement>): Promise<Announcement> {
-    const { data, error } = await supabase.from('announcements').upsert(mapAnnouncementToDb(payload)).select().single();
+    const { data, error } = await getSupabase().from('announcements').upsert(mapAnnouncementToDb(payload)).select().single();
     if (error) throw new Error(error.message);
     return mapDbToAnnouncement(data);
   },
 
   async getTestimonials(): Promise<Testimonial[]> {
-    const { data, error } = await supabase.from('testimonials').select('*');
+    const { data, error } = await getSupabase().from('testimonials').select('*');
     if (error) throw new Error(error.message);
     return data ? data.map(mapDbToTestimonial) : [];
   },
 
   async getOfficeInfo(): Promise<OfficeInfo> {
-    const { data, error } = await supabase.from('office_info').select('*').limit(1).maybeSingle();
+    const { data, error } = await getSupabase().from('office_info').select('*').limit(1).maybeSingle();
     if (error) {
       console.warn('Failed to get office info:', error.message);
       return { id: 'd3b07384-d113-4ec2-a5e6-df06d3e69f8c', address: '', phone1: '', phone2: '', whatsapp: '', email1: '', email2: '', mapsLink: '', businessHours: '' } as OfficeInfo;
@@ -704,7 +704,7 @@ ${answersSummary}`;
 
   async getRevenueReports(): Promise<any> {
     // Generate dynamically from ledger_transactions
-    const { data, error } = await supabase.from('ledger_transactions').select('amount, type');
+    const { data, error } = await getSupabase().from('ledger_transactions').select('amount, type');
     if (error) return { monthly: 0, yearly: 0, total: 0 };
     let total = 0;
     data?.forEach(tx => { if (tx.type === 'Credit') total += Number(tx.amount); });
@@ -713,14 +713,14 @@ ${answersSummary}`;
 
   async trackSearch(target: string, type: string): Promise<void> {
     try {
-      await supabase.from('search_analytics').insert({ target, type });
+      await getSupabase().from('search_analytics').insert({ target, type });
     } catch (err) {
       console.error(err);
     }
   },
   
   async getAnalytics(): Promise<SearchAnalytics[]> {
-    const { data, error } = await supabase.from('search_analytics').select('*');
+    const { data, error } = await getSupabase().from('search_analytics').select('*');
     if (error) throw new Error(error.message);
     return data ? data.map(mapDbToSearchAnalytics) : [];
   },
@@ -785,7 +785,7 @@ ${answersSummary}`;
   },
 
   async saveTask(task: Partial<Task>): Promise<Task> {
-    const { data, error } = await supabase.from('tasks').upsert(mapTaskToDb(task)).select().single();
+    const { data, error } = await getSupabase().from('tasks').upsert(mapTaskToDb(task)).select().single();
     if (error) throw new Error(error.message);
     return mapDbToTask(data);
   },
@@ -815,31 +815,31 @@ ${answersSummary}`;
 
   // --- LOCATIONS ---
   async getLocations(): Promise<Location[]> {
-    const { data, error } = await supabase.from('locations').select('*').order('name');
+    const { data, error } = await getSupabase().from('locations').select('*').order('name');
     if (error) throw new Error(error.message);
     return data || [];
   },
 
   async saveLocation(loc: Partial<Location>): Promise<Location> {
-    const { data, error } = await supabase.from('locations').upsert(loc).select().single();
+    const { data, error } = await getSupabase().from('locations').upsert(loc).select().single();
     if (error) throw new Error(error.message);
     return data as Location;
   },
 
   async deleteLocation(id: string): Promise<void> {
-    const { error } = await supabase.from('locations').delete().eq('id', id);
+    const { error } = await getSupabase().from('locations').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 
   // --- PROPERTY SUBMISSIONS ---
   async getSubmissions(): Promise<any[]> {
-    const { data, error } = await supabase.from('property_submissions').select('*').order('created_at', { ascending: false });
+    const { data, error } = await getSupabase().from('property_submissions').select('*').order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
   },
 
   async createSubmission(payload: any): Promise<any> {
-    const { data, error } = await supabase.from('property_submissions').insert(payload).select().single();
+    const { data, error } = await getSupabase().from('property_submissions').insert(payload).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
@@ -857,13 +857,13 @@ ${answersSummary}`;
 
   // --- PROPERTY REQUESTS ---
   async getRequests(): Promise<any[]> {
-    const { data, error } = await supabase.from('property_requests').select('*').order('created_at', { ascending: false });
+    const { data, error } = await getSupabase().from('property_requests').select('*').order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
   },
 
   async createRequest(payload: any): Promise<any> {
-    const { data, error } = await supabase.from('property_requests').insert(payload).select().single();
+    const { data, error } = await getSupabase().from('property_requests').insert(payload).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
@@ -881,7 +881,7 @@ ${answersSummary}`;
 
   // --- DOCUMENTS ---
   async getDocuments(customerId?: string): Promise<any[]> {
-    let query = supabase.from('documents').select('*').order('generated_date', { ascending: false });
+    let query = getSupabase().from('documents').select('*').order('generated_date', { ascending: false });
     if (customerId) query = query.eq('customer_id', customerId);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
@@ -889,7 +889,7 @@ ${answersSummary}`;
   },
 
   async saveDocument(doc: any): Promise<any> {
-    const { data, error } = await supabase.from('documents').upsert(doc).select().single();
+    const { data, error } = await getSupabase().from('documents').upsert(doc).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
@@ -931,7 +931,7 @@ ${answersSummary}`;
 
   // --- ANNOUNCEMENTS: DELETE ---
   async deleteAnnouncement(id: string): Promise<void> {
-    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    const { error } = await getSupabase().from('announcements').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 
@@ -949,13 +949,13 @@ ${answersSummary}`;
 
   // --- TESTIMONIALS ---
   async saveTestimonial(payload: any): Promise<any> {
-    const { data, error } = await supabase.from('testimonials').upsert(mapTestimonialToDb(payload)).select().single();
+    const { data, error } = await getSupabase().from('testimonials').upsert(mapTestimonialToDb(payload)).select().single();
     if (error) throw new Error(error.message);
     return mapDbToTestimonial(data);
   },
 
   async deleteTestimonial(id: string): Promise<void> {
-    const { error } = await supabase.from('testimonials').delete().eq('id', id);
+    const { error } = await getSupabase().from('testimonials').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 
@@ -972,7 +972,7 @@ ${answersSummary}`;
   },
 
   async deleteWebsiteEnquiry(id: string): Promise<void> {
-    const { error } = await supabase.from('website_enquiries').delete().eq('id', id);
+    const { error } = await getSupabase().from('website_enquiries').delete().eq('id', id);
     if (error) throw new Error(error.message);
   },
 

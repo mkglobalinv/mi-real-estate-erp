@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { createClient } from '@/utils/supabase/client';
 import { PropertySubmission } from '@/lib/types';
 
-const supabase = createClient();
+
 
 export default function AdminSubmissionsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
   const [submissions, setSubmissions] = useState<PropertySubmission[]>([]);
@@ -26,6 +26,7 @@ export default function AdminSubmissionsPage({ basePath = '/admin', params: rout
 
   const handleAssign = (id: string, staffName: string) => {
     api.updateSubmissionStatus(id, submissions.find(s => s.id === id)?.status || 'Pending Review').then(fetchSubmissions);
+    const supabase = createClient();
     supabase.from('property_submissions').update({ assigned_to: staffName }).eq('id', id).then(() => fetchSubmissions());
     api.logActivity({ module: 'Submissions', action: `Assigned Submission review to ${staffName}`, user: 'System' });
   };
