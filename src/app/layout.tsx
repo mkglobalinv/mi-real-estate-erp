@@ -5,6 +5,7 @@ import Footer from "@/components/layout/Footer";
 import MobileStickyActions from "@/components/layout/MobileStickyActions";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: "M.I. Real Estate & General Enterprises Ltd",
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`font-sans antialiased bg-gray-50 text-gray-900 pb-16 md:pb-0`}>
+        <Toaster position="top-right" />
         {children}
         <FloatingWhatsApp />
       </body>
