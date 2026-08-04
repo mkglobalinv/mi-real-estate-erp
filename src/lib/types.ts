@@ -301,6 +301,19 @@ export interface Testimonial {
 
 // --- PHASE 3 ERP INTERFACES ---
 
+export interface Application extends BaseRolePrep {
+  id: string;
+  ref: string;
+  customerId: string;
+  propertyId?: string;
+  status: 'Pending Review' | 'Director Reviewed' | 'Chairman Approved' | 'Rejected';
+  documentsVerified: boolean;
+  submittedBy?: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+  createdAt: string;
+}
+
 export interface Customer extends BaseRolePrep {
   id: string;
   ref: string; // e.g. MIRE-CUS-2026-0001
@@ -314,7 +327,7 @@ export interface Customer extends BaseRolePrep {
   nextOfKinPhone: string;
   nextOfKinAddress?: string;
   registrationDate: string;
-  status: 'Pending Review' | 'Director Approved' | 'Chairman Approved' | 'Rejected' | 'Active';
+  status: 'Pending Review' | 'Active' | 'Inactive';
   createdAt?: string;
 }
 

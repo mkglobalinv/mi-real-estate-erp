@@ -88,7 +88,7 @@ export async function updateSession(request: NextRequest) {
       
       // If user is trying to access a root portal that is not their own, immediately redirect to their own portal
       
-      if (pathname.startsWith('/admin') && role !== 'Super Admin') {
+      if ((pathname === '/admin' || pathname.startsWith('/admin/')) && role !== 'Super Admin') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)

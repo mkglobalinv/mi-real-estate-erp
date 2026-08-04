@@ -175,6 +175,33 @@ export function mapInstallmentToDb(inst: Partial<Installment>): any {
   };
 }
 
+export function mapDbToApplication(db: any): any {
+  return {
+    ...db,
+    customerId: db.customer_id,
+    propertyId: db.property_id,
+    documentsVerified: db.documents_verified,
+    submittedBy: db.submitted_by,
+    reviewedBy: db.reviewed_by,
+    approvedBy: db.approved_by,
+    createdAt: db.created_at
+  };
+}
+
+export function mapApplicationToDb(app: any): any {
+  return {
+    ...(app.id && { id: app.id }),
+    ...(app.ref && { ref: app.ref }),
+    ...(app.customerId && { customer_id: app.customerId }),
+    ...(app.propertyId && { property_id: app.propertyId }),
+    ...(app.status && { status: app.status }),
+    ...(app.documentsVerified !== undefined && { documents_verified: app.documentsVerified }),
+    ...(app.submittedBy && { submitted_by: app.submittedBy }),
+    ...(app.reviewedBy && { reviewed_by: app.reviewedBy }),
+    ...(app.approvedBy && { approved_by: app.approvedBy })
+  };
+}
+
 export function mapDbToPaymentProof(db: any): PaymentProof {
   return {
     ...db,

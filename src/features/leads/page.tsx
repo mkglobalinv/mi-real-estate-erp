@@ -150,12 +150,8 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
                       onChange={async (e) => {
                         const newStatus = e.target.value as any;
                         try {
-                          if (newStatus === 'Closed Won') {
-                            await api.convertLeadToCustomer(lead.id);
-                            toast.success('Lead converted to Customer successfully!');
-                          } else {
-                            await api.updateLeadStatus(lead.id, newStatus);
-                          }
+                          await api.updateLeadStatus(lead.id, newStatus);
+                          toast.success(`Lead status updated to ${newStatus}`);
                           fetchLeads();
                         } catch (err: any) {
                           toast.error(err.message || 'Failed to update lead status');
@@ -168,7 +164,7 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
                       <option value="Follow Up">Follow Up</option>
                       <option value="Qualified">Qualified</option>
                       <option value="Negotiation">Negotiation</option>
-                      <option value="Closed Won">Closed Won</option>
+                      <option value="Ready for Application">Ready for Application (Forward to Secretary)</option>
                       <option value="Closed Lost">Closed Lost</option>
                     </select>
                   </td>

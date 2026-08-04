@@ -29,7 +29,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.saveCustomer({
+      const newCustomer = await api.saveCustomer({
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
@@ -38,9 +38,17 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
         nextOfKinName: formData.nokName,
         nextOfKinPhone: formData.nokPhone,
         nextOfKinRelationship: formData.nokRelation,
-        status: 'Active'
+        status: 'Pending Review'
       });
-      toast.success('Customer registered successfully!');
+      
+      // Auto-generate application
+      await api.saveApplication({
+        customerId: newCustomer.id,
+        status: 'Pending Review',
+        documentsVerified: false
+      });
+      
+      toast.success('Customer registered & Application created! (Pending Review)');
       setIsFormOpen(false);
       setFormData({ fullName: '', email: '', phone: '', address: '', occupation: '', nokName: '', nokPhone: '', nokRelation: '' });
       loadData();

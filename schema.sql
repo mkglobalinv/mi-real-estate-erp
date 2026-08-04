@@ -360,3 +360,17 @@ CREATE TABLE IF NOT EXISTS public.campaign_analytics (
     event_type TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 16. APPLICATIONS
+CREATE TABLE IF NOT EXISTS public.applications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ref TEXT UNIQUE NOT NULL,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,
+    property_id UUID REFERENCES public.properties(id) ON DELETE SET NULL,
+    status TEXT DEFAULT 'Pending Review',
+    documents_verified BOOLEAN DEFAULT false,
+    submitted_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    approved_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

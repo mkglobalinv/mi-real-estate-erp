@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapNotificationToDb, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapSearchAnalyticsToDb } from './supabase-mappers';
-import { PropertyListing, Project, Customer, Lead, Campaign, CampaignQuestion, CampaignFaq, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location } from './types';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapNotificationToDb, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapSearchAnalyticsToDb, mapDbToApplication, mapApplicationToDb } from './supabase-mappers';
+import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
 
@@ -168,6 +168,37 @@ export const api = {
       return mapDbToEasyBuyAccount(data);
     } catch (err) {
       console.error('Failed to save easy buy account', err);
+      throw err;
+    }
+  },
+
+  // --- APPLICATIONS ---
+  async getApplications(): Promise<any[]> {
+    try {
+      const { data, error } = await getSupabase().from('applications').select('*').order('created_at', { ascending: false });
+      if (error) throw new Error(`Supabase error: ${error.message}`);
+      if (data) return data.map(mapDbToApplication);
+      return [];
+    } catch (err) {
+      console.error('Failed to get applications', err);
+      throw err;
+    }
+  },
+
+  async saveApplication(app: any): Promise<any> {
+    try {
+      if (!app.id && !app.ref) {
+        const { count, error: countErr } = await getSupabase().from('applications').select('*', { count: 'exact', head: true });
+        if (countErr) throw new Error(countErr.message);
+        app.ref = `APP-2026-${String((count || 0) + 1).padStart(4, '0')}`;
+      }
+
+      const mapped = mapApplicationToDb(app);
+      const { data, error } = await getSupabase().from('applications').upsert(mapped).select().single();
+      if (error) throw new Error(`Supabase error: ${error.message}`);
+      return mapDbToApplication(data);
+    } catch (err) {
+      console.error('Failed to save application', err);
       throw err;
     }
   },

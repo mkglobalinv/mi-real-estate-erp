@@ -138,13 +138,13 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               </>
             )}
 
-            {/* SECRETARY EXCLUSIVES */}
-            {(role === 'Secretary' || role === 'Chairman' || role === 'Super Admin') && (
+            {/* FINANCE & ADMIN */}
+            {(role === 'Chairman' || role === 'Super Admin' || role === 'Finance') && (
               <>
                 <div className="pt-6 pb-1 px-4">
                   <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Finance & Admin</p>
                 </div>
-                {(role === 'Secretary' || role === 'Super Admin') && (
+                {(role === 'Super Admin' || role === 'Finance') && (
                   <Link href="/secretary/reservations" onClick={closeMenu} className={linkClass('/admin/reservations')}>
                     <Wallet className={iconClass('/admin/reservations')} />
                     Reservations
