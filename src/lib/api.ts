@@ -947,6 +947,37 @@ ${answersSummary}`;
     return mapDbToLead(data);
   },
 
+  // --- LEADS: CONVERT TO CUSTOMER ---
+  async convertLeadToCustomer(leadId: string): Promise<Customer> {
+    const supabase = getSupabase();
+    // 1. Fetch Lead
+    const { data: leadData, error: leadError } = await supabase.from('leads').select('*').eq('id', leadId).single();
+    if (leadError) throw new Error(`Lead fetch failed: ${leadError.message}`);
+    
+    // 2. Generate new Customer Ref (We use a random number for now or query max count)
+    const refCount = Math.floor(Math.random() * 10000);
+    const customerRef = generateCustomerRef(refCount);
+    
+    // 3. Create Customer
+    const newCustomer = {
+      ref: customerRef,
+      full_name: leadData.name,
+      phone: leadData.phone,
+      whatsapp: leadData.whatsapp,
+      email: leadData.email,
+      address: leadData.location,
+      status: 'Active'
+    };
+    
+    const { data: customerData, error: custError } = await supabase.from('customers').insert(newCustomer).select().single();
+    if (custError) throw new Error(`Customer creation failed: ${custError.message}`);
+    
+    // 4. Update Lead status to 'Closed Won'
+    await supabase.from('leads').update({ status: 'Closed Won' }).eq('id', leadId);
+    
+    return mapDbToCustomer(customerData);
+  },
+
   // --- TESTIMONIALS ---
   async saveTestimonial(payload: any): Promise<any> {
     const { data, error } = await getSupabase().from('testimonials').upsert(mapTestimonialToDb(payload)).select().single();

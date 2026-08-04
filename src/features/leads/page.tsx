@@ -12,6 +12,9 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
   const [leads, setLeads] = useState<Lead[]>([]);
   const { role, loading: roleLoading } = useRole();
   const [mounted, setMounted] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const fetchLeads = () => {
     api.getLeads().then(setLeads);
@@ -35,6 +38,17 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
   const isSocialMediaDirector = role === 'Social Media Director';
   const isCustomerCare = role === 'Customer Care';
 
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = searchTerm === '' || 
+      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      lead.phone.includes(searchTerm) || 
+      lead.ref.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === '' || lead.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="pb-20">
       <div className="flex justify-between items-center mb-8">
@@ -42,10 +56,36 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Leads Pipeline CRM</h1>
           <p className="text-gray-500 font-medium mt-1">Manage, qualify, and advance customer lifecycles.</p>
         </div>
-        <button onClick={() => toast.error('Filter feature coming soon')} className="btn-primary flex items-center gap-2 text-sm px-4 py-2 font-bold shadow-sm">
-          <Filter className="w-4 h-4" /> Filter Leads
+        <button onClick={() => setShowFilters(!showFilters)} className="btn-primary flex items-center gap-2 text-sm px-4 py-2 font-bold shadow-sm">
+          <Filter className="w-4 h-4" /> {showFilters ? 'Hide Filters' : 'Filter Leads'}
         </button>
       </div>
+
+      {showFilters && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6 flex gap-4">
+          <input 
+            type="text" 
+            placeholder="Search by name, phone, or ref..." 
+            className="flex-1 p-2 border border-gray-200 rounded outline-none text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <select 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="p-2 border border-gray-200 rounded outline-none text-sm"
+          >
+            <option value="">All Statuses</option>
+            <option value="New">New</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Follow Up">Follow Up</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Negotiation">Negotiation</option>
+            <option value="Closed Won">Closed Won</option>
+            <option value="Closed Lost">Closed Lost</option>
+          </select>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -60,7 +100,7 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-sm">
-              {leads.map((lead) => (
+              {filteredLeads.map((lead) => (
                 <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="p-4 align-top">
                     <p className="font-bold text-gray-900">{lead.name}</p>
@@ -90,7 +130,7 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
                       value={lead.lifecycleStage || 'Lead'}
                       disabled={true}
                       onChange={(e) => {
-                        toast.error('Lifecycle Stage tracking is not yet integrated with the database');
+                        toast.error('Lifecycle Stage tracking requires Customer conversion workflow completion');
                       }}
                       className={`text-xs font-bold bg-indigo-50 text-indigo-700 rounded-md px-2 py-1.5 outline-none border border-indigo-100 w-full cursor-not-allowed opacity-60`}
                     >
@@ -107,8 +147,19 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
                     <select 
                       value={lead.status}
                       disabled={isSocialMediaDirector}
-                      onChange={(e) => {
-                        api.updateLeadStatus(lead.id, e.target.value as any).then(fetchLeads);
+                      onChange={async (e) => {
+                        const newStatus = e.target.value as any;
+                        try {
+                          if (newStatus === 'Closed Won') {
+                            await api.convertLeadToCustomer(lead.id);
+                            toast.success('Lead converted to Customer successfully!');
+                          } else {
+                            await api.updateLeadStatus(lead.id, newStatus);
+                          }
+                          fetchLeads();
+                        } catch (err: any) {
+                          toast.error(err.message || 'Failed to update lead status');
+                        }
                       }}
                       className={`text-xs font-bold bg-gray-100 text-gray-700 rounded-md px-2 py-1.5 outline-none border border-gray-200 w-full ${isSocialMediaDirector ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                     >
@@ -147,7 +198,7 @@ export default function AdminLeadsPage({ basePath = '/admin', params: routeParam
                   </td>
                 </tr>
               ))}
-              {leads.length === 0 && (
+              {filteredLeads.length === 0 && (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500 font-medium">No leads pipeline data available.</td>
                 </tr>

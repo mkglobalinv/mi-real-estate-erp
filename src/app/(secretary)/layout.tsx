@@ -163,14 +163,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               </>
             )}
 
-            {/* DIRECTOR EXCLUSIVES */}
-            {(role === 'Director' || role === 'Chairman' || role === 'Super Admin') && (
+            {/* EXECUTIVE CRM (Secretary, Director, Chairman) */}
+            {(role === 'Secretary' || role === 'Director' || role === 'Chairman' || role === 'Super Admin') && (
               <>
                 <div className="pt-6 pb-1 px-4">
                   <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Executive CRM</p>
                 </div>
-                <Link href="/secretary/customers" onClick={closeMenu} className={linkClass('/admin/customers')}>
-                  <Users className={iconClass('/admin/customers')} />
+                <Link href="/secretary/customers" onClick={closeMenu} className={linkClass('/secretary/customers')}>
+                  <Users className={iconClass('/secretary/customers')} />
                   Customers & Allocations
                 </Link>
               </>
