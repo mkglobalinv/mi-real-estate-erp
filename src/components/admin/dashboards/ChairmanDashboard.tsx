@@ -47,6 +47,19 @@ export default function ChairmanDashboard() {
         await api.saveCustomer({ ...customer, status: 'Active' });
       }
       
+      // 3. Log Activity and Notify
+      await api.createActivityLog({
+        module: 'Applications',
+        action: 'Chairman Final Approval',
+        details: { appId: app.id, customerId: customer?.id }
+      });
+
+      await api.createNotification({
+        title: 'Customer Activated',
+        message: `Chairman has given final approval for ${customer?.fullName || 'Customer'}. Account is now Active.`,
+        type: 'System'
+      });
+
       toast.success('Application Approved and Customer Activated!');
       loadData();
     } catch (err: any) {

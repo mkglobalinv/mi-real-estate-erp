@@ -1053,4 +1053,33 @@ ${answersSummary}`;
     }
     return response.json();
   },
+
+  // --- LOGGING & NOTIFICATIONS ---
+  async createActivityLog(log: Partial<ActivityLog>): Promise<void> {
+    try {
+      const { error } = await getSupabase().from('activity_logs').insert([{
+        user_id: log.userId,
+        module: log.module,
+        action: log.action,
+        details: log.details || {}
+      }]);
+      if (error) console.error('Activity Log Error:', error);
+    } catch (e) {
+      console.error('Failed to create activity log', e);
+    }
+  },
+
+  async createNotification(notification: Partial<Notification>): Promise<void> {
+    try {
+      const { error } = await getSupabase().from('notifications').insert([{
+        user_id: notification.userId,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type || 'System'
+      }]);
+      if (error) console.error('Notification Error:', error);
+    } catch (e) {
+      console.error('Failed to create notification', e);
+    }
+  }
 };

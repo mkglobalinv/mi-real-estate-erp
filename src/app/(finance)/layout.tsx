@@ -4,16 +4,13 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  Building2, LayoutDashboard, Users, MapPin, PlusCircle, 
-  Settings, Activity, Calendar, Wallet, CheckSquare, FolderGit2,
-  Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone
+  Building2, LayoutDashboard, Wallet,
+  Menu, X, LogoutButton
 } from 'lucide-react';
-import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
-import LogoutButton from '@/components/LogoutButton';
 import UserMenu from '@/components/UserMenu';
 
-function AdminLayoutContent({ children }: { children: React.ReactNode }) {
+function FinanceLayoutContent({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { role, userName, loading } = useRole();
@@ -51,8 +48,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      
-      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -68,7 +63,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
-          <Link href="/admin" className="flex items-center gap-3 group" onClick={closeMenu}>
+          <Link href="/finance" className="flex items-center gap-3 group" onClick={closeMenu}>
             <div className="bg-[var(--color-primary)] p-2 rounded-xl shadow-lg border border-[var(--color-primary-dark)]">
               <Building2 className="text-white w-6 h-6" />
             </div>
@@ -84,36 +79,20 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         
         <div className="flex-1 overflow-y-auto py-6 custom-scrollbar">
           <nav className="space-y-1.5 px-3">
-            
-            {/* DASHBOARD */}
             <div className="pt-2 pb-1 px-4">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Dashboard</p>
             </div>
-            <Link href="/secretary" onClick={closeMenu} className={linkClass('/secretary')}>
-              <LayoutDashboard className={iconClass('/secretary')} />
-              Secretary Dashboard
+            <Link href="/finance" onClick={closeMenu} className={linkClass('/finance')}>
+              <LayoutDashboard className={iconClass('/finance')} />
+              Financial Dashboard
             </Link>
             
-            {/* WORKFLOW (Leads from Customer Care) */}
             <div className="pt-6 pb-1 px-4">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Workflow Pipeline</p>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Transactions</p>
             </div>
-            <Link href="/secretary/leads" onClick={closeMenu} className={linkClass('/secretary/leads')}>
-              <Users className={iconClass('/secretary/leads')} />
-              Lead Queue
-            </Link>
-
-            {/* CORE SECRETARY (Applications & Customers) */}
-            <div className="pt-6 pb-1 px-4">
-              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Core Responsibilities</p>
-            </div>
-            <Link href="/secretary/customers" onClick={closeMenu} className={linkClass('/secretary/customers')}>
-              <Building2 className={iconClass('/secretary/customers')} />
-              Applicant Registration
-            </Link>
-            <Link href="/secretary/applications" onClick={closeMenu} className={linkClass('/secretary/applications')}>
-              <CheckSquare className={iconClass('/secretary/applications')} />
-              Application Records
+            <Link href="/finance/ledger" onClick={closeMenu} className={linkClass('/finance/ledger')}>
+              <Wallet className={iconClass('/finance/ledger')} />
+              Ledger & Receipts
             </Link>
           </nav>
         </div>
@@ -126,47 +105,30 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <p className="text-sm font-bold text-white leading-tight">{userName || 'Loading...'}</p>
             <p className="text-[11px] text-[var(--color-primary)] font-medium uppercase tracking-wider">{role}</p>
           </div>
-          <div className="ml-2">
-            <LogoutButton className="text-gray-400 hover:text-red-400 bg-gray-800 p-2 rounded-lg hover:bg-gray-700" />
-          </div>
         </div>
       </aside>
       
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden w-full relative">
         <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-8 z-30 sticky top-0">
-          <div className="flex items-center flex-1">
+          <div className="flex items-center">
             <button 
-              className="md:hidden p-2 -ml-2 mr-2 text-gray-600 hover:text-[var(--color-primary)] hover:bg-gray-100 rounded-lg transition-colors"
+              className="md:hidden mr-4 p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               onClick={() => setMobileMenuOpen(true)}
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="hidden sm:flex flex-1 max-w-xl">
-              <GlobalSearch />
-            </div>
+            <h2 className="text-xl font-bold text-gray-900 hidden sm:block tracking-tight">Finance Portal</h2>
           </div>
           
-          <div className="flex items-center gap-3 sm:gap-5">
-            <Link href="/secretary/leads">
-              <button className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white text-sm font-bold rounded-full hover:bg-green-700 transition-colors shadow-sm">
-                <PlusCircle className="w-4 h-4" /> CRM Dashboard
-              </button>
-            </Link>
-
-            <button className="relative p-2 text-gray-500 hover:text-[var(--color-primary)] hover:bg-green-50 rounded-full transition-colors">
-              <Bell className="w-5 h-5" />
-            </button>
-            <div className="h-6 w-px bg-gray-200 mx-1"></div>
-            <Link href="/" target="_blank" className="hidden sm:flex items-center gap-1.5 text-sm text-gray-600 hover:text-[var(--color-primary)] font-medium transition-colors">
-              Website <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
-            <UserMenu />
+          <div className="flex items-center gap-3">
+            <UserMenu userName={userName || ''} role={role || ''} />
           </div>
         </header>
-        
-        <div className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 bg-gray-50 custom-scrollbar">
-          <div className="max-w-[1600px] mx-auto">
+
+        <div className="flex-1 overflow-auto bg-gray-50/50 relative">
+          <div className="absolute inset-0 bg-grid-slate-100/[0.04] bg-[bottom_1px_center] [mask-image:linear-gradient(to_bottom,white,transparent)]" />
+          <div className="relative">
             {children}
           </div>
         </div>
@@ -175,14 +137,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function AdminLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function FinanceLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleProvider>
-      <AdminLayoutContent>{children}</AdminLayoutContent>
+      <FinanceLayoutContent>{children}</FinanceLayoutContent>
     </RoleProvider>
   );
 }

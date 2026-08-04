@@ -68,11 +68,12 @@ export async function updateSession(request: NextRequest) {
       'Customer Care': '/customer-care',
       'Social Media Director': '/social-media-director',
       'Admin Engineer': '/admin-engineer',
+      'Finance': '/finance',
       'Super Admin': '/admin',
       'Customer': '/portal'
     }
 
-    const isStaffRoute = ['/admin', '/chairman', '/director', '/secretary', '/customer-care', '/social-media-director', '/admin-engineer'].some(p => pathname.startsWith(p))
+    const isStaffRoute = ['/admin', '/chairman', '/director', '/secretary', '/customer-care', '/social-media-director', '/admin-engineer', '/finance', '/archive'].some(p => pathname.startsWith(p))
 
     if (!role && isStaffRoute) {
       // If user has no role and tries to access staff portals, redirect to login
@@ -125,6 +126,18 @@ export async function updateSession(request: NextRequest) {
       }
 
       if (pathname.startsWith('/admin-engineer') && role !== 'Admin Engineer') {
+        const url = request.nextUrl.clone()
+        url.pathname = portalPath || '/portal'
+        return NextResponse.redirect(url)
+      }
+
+      if (pathname.startsWith('/finance') && role !== 'Finance') {
+        const url = request.nextUrl.clone()
+        url.pathname = portalPath || '/portal'
+        return NextResponse.redirect(url)
+      }
+
+      if (pathname.startsWith('/archive') && role !== 'Super Admin' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)

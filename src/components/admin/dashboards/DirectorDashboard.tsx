@@ -32,11 +32,23 @@ export default function DirectorDashboard() {
 
   const handleApprove = async (appId: string) => {
     try {
-      // In a real implementation we'd just update the application status to Director Reviewed
-      // But we don't have an updateApplicationStatus method yet. We can use saveApplication.
       const app = applications.find(a => a.id === appId);
+      const customer = customers.find(c => c.id === app?.customerId);
       if (app) {
         await api.saveApplication({ ...app, status: 'Director Reviewed' });
+        
+        await api.createActivityLog({
+          module: 'Applications',
+          action: 'Director Approval',
+          details: { appId: app.id, ref: app.ref }
+        });
+
+        await api.createNotification({
+          title: 'Application Reviewed by Director',
+          message: `Application ${app.ref} for ${customer?.fullName || 'Customer'} has been reviewed and forwarded to Chairman.`,
+          type: 'System'
+        });
+
         toast.success('Application forwarded to Chairman');
         loadData();
       }
@@ -48,8 +60,22 @@ export default function DirectorDashboard() {
   const handleReject = async (appId: string) => {
     try {
       const app = applications.find(a => a.id === appId);
+      const customer = customers.find(c => c.id === app?.customerId);
       if (app) {
         await api.saveApplication({ ...app, status: 'Rejected' });
+        
+        await api.createActivityLog({
+          module: 'Applications',
+          action: 'Director Rejection',
+          details: { appId: app.id, ref: app.ref }
+        });
+
+        await api.createNotification({
+          title: 'Application Rejected by Director',
+          message: `Application ${app.ref} for ${customer?.fullName || 'Customer'} was rejected.`,
+          type: 'Alert'
+        });
+
         toast.success('Application rejected and returned to Secretary');
         loadData();
       }

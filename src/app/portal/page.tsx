@@ -7,20 +7,47 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { getSupabase } from '@/lib/supabase';
+import { Customer, Application, Allocation } from '@/lib/types';
+
 export default function PortalDashboard() {
   const [mounted, setMounted] = useState(false);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [application, setApplication] = useState<Application | null>(null);
+  const [allocation, setAllocation] = useState<Allocation | null>(null);
 
   useEffect(() => {
-    setMounted(true);
+    async function loadUserData() {
+      try {
+        const supabase = getSupabase();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.email) {
+          const { data: cust } = await supabase.from('customers').select('*').eq('email', user.email).single();
+          if (cust) {
+            setCustomer(cust);
+            const { data: app } = await supabase.from('applications').select('*').eq('customer_id', cust.id).order('created_at', { ascending: false }).limit(1).single();
+            if (app) setApplication(app);
+
+            const { data: alloc } = await supabase.from('allocations').select('*').eq('customer_id', cust.id).order('created_at', { ascending: false }).limit(1).single();
+            if (alloc) setAllocation(alloc);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load portal data', e);
+      } finally {
+        setMounted(true);
+      }
+    }
+    loadUserData();
   }, []);
 
   if (!mounted) return null;
 
-  // Mock data for the UI prototype
-  const progressPercent = 65;
-  const isChairmanApproved = true;
-  const isAllocated = true;
-  const isPaymentUpToDate = true;
+  // Real data for the UI prototype
+  const progressPercent = 0; // Requires Ledger Integration to calculate properly
+  const isChairmanApproved = customer?.status === 'Active';
+  const isAllocated = !!allocation;
+  const isPaymentUpToDate = true; // Requires Ledger integration
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24">
@@ -30,7 +57,7 @@ export default function PortalDashboard() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold mb-2 tracking-tight">Welcome back, Jamilu!</h1>
+            <h1 className="text-3xl md:text-4xl font-extrabold mb-2 tracking-tight">Welcome back, {customer?.full_name || 'Customer'}!</h1>
             <p className="text-green-50 font-medium max-w-lg opacity-90">
               Your Easy Buy investment is progressing smoothly. You are currently on track to complete your payments by December 2026.
             </p>
@@ -57,24 +84,24 @@ export default function PortalDashboard() {
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Registration</p>
             <p className="text-lg font-extrabold text-gray-900 mb-1">
-              {isChairmanApproved ? 'Chairman Approved' : 'Pending Review'}
+              {isChairmanApproved ? 'Chairman Approved' : application?.status || 'Pending Review'}
             </p>
-            <p className="text-xs text-gray-500 font-medium">Your Easy Buy account is fully active.</p>
+            <p className="text-xs text-gray-500 font-medium">Your Easy Buy account is {isChairmanApproved ? 'fully active' : 'under review'}.</p>
           </div>
         </div>
 
         {/* Allocation Status */}
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-start gap-4">
           <div className={`p-3 rounded-full shrink-0 ${isAllocated ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-            {isAllocated ? <MapPin className="w-6 h-6" /> : <MapPin className="w-6 h-6" />}
+            <MapPin className="w-6 h-6" />
           </div>
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Allocation</p>
             <p className="text-lg font-extrabold text-gray-900 mb-1">
-              {isAllocated ? 'Allocated' : 'Not Allocated'}
+              {isAllocated ? allocation?.status || 'Allocated' : 'Not Allocated'}
             </p>
             <p className="text-xs text-gray-500 font-medium">
-              {isAllocated ? 'Plot 42, Block C, Yarimawa' : 'Pending completion criteria.'}
+              {isAllocated ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending completion criteria.'}
             </p>
           </div>
         </div>
