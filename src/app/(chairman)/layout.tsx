@@ -89,145 +89,50 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="pt-2 pb-1 px-4">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Dashboard</p>
             </div>
-            <Link href="/admin" onClick={closeMenu} className={linkClass('/admin')}>
-              <LayoutDashboard className={iconClass('/admin')} />
-              Overview Dashboard
+            <Link href="/chairman" onClick={closeMenu} className={linkClass('/chairman')}>
+              <LayoutDashboard className={iconClass('/chairman')} />
+              Executive Dashboard
             </Link>
             
-            {/* CRM & SALES - Social Media Director & Customer Care */}
-            {(role === 'Social Media Director' || role === 'Customer Care' || role === 'Super Admin') && (
-              <>
-                <div className="pt-6 pb-1 px-4">
-                  <p className="text-[11px] font-bold text-[var(--color-primary)] uppercase tracking-widest">Leads & CRM</p>
-                </div>
-                <Link href="/chairman/leads" onClick={closeMenu} className={linkClass('/admin/leads')}>
-                  <Users className={iconClass('/admin/leads')} />
-                  Leads Pipeline
-                </Link>
-              </>
-            )}
+            {/* APPROVALS */}
+            <div className="pt-6 pb-1 px-4">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Action Required</p>
+            </div>
+            <Link href="/chairman/approvals" onClick={closeMenu} className={linkClass('/chairman/approvals')}>
+              <CheckSquare className={iconClass('/chairman/approvals')} />
+              Pending Applications
+            </Link>
+            <Link href="/chairman/agreements" onClick={closeMenu} className={linkClass('/chairman/agreements')}>
+              <CheckSquare className={iconClass('/chairman/agreements')} />
+              Agreement Review
+            </Link>
 
-            {/* CUSTOMER CARE EXCLUSIVES */}
-            {(role === 'Customer Care' || role === 'Super Admin') && (
-              <>
-                <Link href="/chairman/tickets" onClick={closeMenu} className={linkClass('/admin/tickets')}>
-                  <CheckSquare className={iconClass('/admin/tickets')} />
-                  Support Tickets
-                </Link>
-                <Link href="/chairman/inspections" onClick={closeMenu} className={linkClass('/admin/inspections')}>
-                  <Calendar className={iconClass('/admin/inspections')} />
-                  Inspections
-                </Link>
-              </>
-            )}
 
-            {/* MARKETING - Social Media Director Exclusives */}
-            {(role === 'Social Media Director' || role === 'Super Admin') && (
-              <>
-                <div className="pt-6 pb-1 px-4">
-                  <p className="text-[11px] font-bold text-purple-400 uppercase tracking-widest">Marketing</p>
-                </div>
-                <Link href="/chairman/campaigns" onClick={closeMenu} className={linkClass('/admin/campaigns')}>
-                  <Megaphone className={iconClass('/admin/campaigns')} />
-                  Campaign Manager
-                </Link>
-                <Link href="/chairman/announcements" onClick={closeMenu} className={linkClass('/admin/operations/announcements')}>
-                  <Megaphone className={iconClass('/admin/operations/announcements')} />
-                  Announcements
-                </Link>
-              </>
-            )}
+            {/* OVERSIGHT */}
+            <div className="pt-6 pb-1 px-4">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Executive Oversight</p>
+            </div>
+            <Link href="/chairman/customers" onClick={closeMenu} className={linkClass('/chairman/customers')}>
+              <Users className={iconClass('/chairman/customers')} />
+              Customer Profiles
+            </Link>
+            <Link href="/chairman/reports" onClick={closeMenu} className={linkClass('/chairman/reports')}>
+              <Activity className={iconClass('/chairman/reports')} />
+              Executive Reports
+            </Link>
 
-            {/* SECRETARY EXCLUSIVES */}
-            {(role === 'Secretary' || role === 'Chairman' || role === 'Super Admin') && (
-              <>
-                <div className="pt-6 pb-1 px-4">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Finance & Admin</p>
-                </div>
-                {(role === 'Secretary' || role === 'Super Admin') && (
-                  <Link href="/chairman/reservations" onClick={closeMenu} className={linkClass('/admin/reservations')}>
-                    <Wallet className={iconClass('/admin/reservations')} />
-                    Reservations
-                  </Link>
-                )}
-                <Link href="/chairman/payments" onClick={closeMenu} className={linkClass('/admin/payments')}>
-                  <Wallet className={iconClass('/admin/payments')} />
-                  Payments & Ledger
-                </Link>
-                {(role === 'Chairman' || role === 'Super Admin') && (
-                  <Link href="/chairman/approvals" onClick={closeMenu} className={linkClass('/admin/approvals')}>
-                    <CheckSquare className={iconClass('/admin/approvals')} />
-                    Approvals
-                  </Link>
-                )}
-              </>
-            )}
-
-            {/* DIRECTOR EXCLUSIVES */}
-            {(role === 'Director' || role === 'Chairman' || role === 'Super Admin') && (
-              <>
-                <div className="pt-6 pb-1 px-4">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Executive CRM</p>
-                </div>
-                <Link href="/chairman/customers" onClick={closeMenu} className={linkClass('/admin/customers')}>
-                  <Users className={iconClass('/admin/customers')} />
-                  Customers & Allocations
-                </Link>
-              </>
-            )}
-            
-            {/* PROPERTIES & SYSTEM - Admin Engineer Exclusives */}
-            {(role === 'Admin Engineer' || role === 'Super Admin' || role === 'Director' || role === 'Chairman') && (
-              <>
-                <div className="pt-6 pb-1 px-4">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Web Properties</p>
-                </div>
-                <Link href="/chairman/projects" onClick={closeMenu} className={linkClass('/admin/projects')}>
-                  <FolderGit2 className={iconClass('/admin/projects')} />
-                  Estate Projects
-                </Link>
-                {(role === 'Admin Engineer' || role === 'Super Admin') && (
-                  <>
-                    <Link href="/chairman/listings" onClick={closeMenu} className={linkClass('/admin/listings')}>
-                      <MapPin className={iconClass('/admin/listings')} />
-                      Website Listings
-                    </Link>
-                    <Link href="/chairman/property-submissions" onClick={closeMenu} className={linkClass('/admin/property-submissions')}>
-                      <PlusCircle className={iconClass('/admin/property-submissions')} />
-                      External Submissions
-                    </Link>
-                  </>
-                )}
-              </>
-            )}
-            
-            {/* SYSTEM */}
-            {(role === 'Admin Engineer' || role === 'Super Admin' || role === 'Chairman') && (
-              <>
-                <div className="pt-6 pb-1 px-4">
-                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">System</p>
-                </div>
-                <Link href="/chairman/logs" onClick={closeMenu} className={linkClass('/admin/logs')}>
-                  <Activity className={iconClass('/admin/logs')} />
-                  Global Audit Logs
-                </Link>
-                {(role === 'Admin Engineer' || role === 'Super Admin') && (
-                  <>
-                    <Link href="/chairman/tasks" onClick={closeMenu} className={linkClass('/admin/tasks')}>
-                      <CheckSquare className={iconClass('/admin/tasks')} />
-                      System Tasks
-                    </Link>
-                    <Link href="/chairman/settings" onClick={closeMenu} className={linkClass('/admin/settings')}>
-                      <Settings className={iconClass('/admin/settings')} />
-                      System Settings
-                    </Link>
-                    <div className="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 flex items-center cursor-not-allowed">
-                      <Shield className="flex-shrink-0 mr-3 w-5 h-5 opacity-40" /> User Roles Matrix
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+            {/* SYSTEM LOGS */}
+            <div className="pt-6 pb-1 px-4">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">System Audit</p>
+            </div>
+            <Link href="/chairman/notifications" onClick={closeMenu} className={linkClass('/chairman/notifications')}>
+              <Bell className={iconClass('/chairman/notifications')} />
+              Notifications
+            </Link>
+            <Link href="/chairman/logs" onClick={closeMenu} className={linkClass('/chairman/logs')}>
+              <Activity className={iconClass('/chairman/logs')} />
+              Activity Logs
+            </Link>
           </nav>
         </div>
         
@@ -261,19 +166,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
           
           <div className="flex items-center gap-3 sm:gap-5">
-            <Link href="/chairman/leads">
-              <button className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white text-sm font-bold rounded-full hover:bg-green-700 transition-colors shadow-sm">
-                <PlusCircle className="w-4 h-4" /> CRM Dashboard
-              </button>
-            </Link>
+
 
             <button className="relative p-2 text-gray-500 hover:text-[var(--color-primary)] hover:bg-green-50 rounded-full transition-colors">
               <Bell className="w-5 h-5" />
             </button>
-            <div className="h-6 w-px bg-gray-200 mx-1"></div>
-            <Link href="/" target="_blank" className="hidden sm:flex items-center gap-1.5 text-sm text-gray-600 hover:text-[var(--color-primary)] font-medium transition-colors">
-              Website <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
+
             <UserMenu />
           </div>
         </header>

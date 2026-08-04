@@ -306,7 +306,7 @@ export interface Application extends BaseRolePrep {
   ref: string;
   customerId: string;
   propertyId?: string;
-  status: 'Pending Review' | 'Director Reviewed' | 'Chairman Approved' | 'Rejected';
+  status: 'Pending Review' | 'Director Reviewed' | 'Chairman Approved' | 'Rejected' | 'Returned to Secretary';
   documentsVerified: boolean;
   submittedBy?: string;
   reviewedBy?: string;

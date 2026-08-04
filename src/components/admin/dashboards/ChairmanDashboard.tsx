@@ -5,12 +5,13 @@ import { api } from '@/lib/api';
 import { Application, Customer } from '@/lib/types';
 import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import Link from 'next/link';
 
 export default function ChairmanDashboard() {
-  const [allocations, setAllocations] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [revenue, setRevenue] = useState<any>({ monthly: 0 });
+  const [revenue, setRevenue] = useState<any>({ monthly: 0, total: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,13 +20,13 @@ export default function ChairmanDashboard() {
 
   async function loadData() {
     try {
-      const [allAllocations, allCustomers, allRevenue, allApps] = await Promise.all([
-        api.getAllocations(),
+      const [allDocs, allCustomers, allRevenue, allApps] = await Promise.all([
+        (api as any).getDocuments ? (api as any).getDocuments() : Promise.resolve([]),
         api.getCustomers(),
         api.getRevenueReports(),
         api.getApplications()
       ]);
-      setAllocations(allAllocations);
+      setDocuments(allDocs);
       setCustomers(allCustomers);
       setRevenue(allRevenue);
       setApplications(allApps);
@@ -38,16 +39,12 @@ export default function ChairmanDashboard() {
 
   const handleFinalApproval = async (app: Application) => {
     try {
-      // 1. Approve Application
+      // 1. Approve Application (Forward to Finance)
       await api.saveApplication({ ...app, status: 'Chairman Approved' });
       
-      // 2. Activate Customer
       const customer = customers.find(c => c.id === app.customerId);
-      if (customer) {
-        await api.saveCustomer({ ...customer, status: 'Active' });
-      }
       
-      // 3. Log Activity and Notify
+      // 2. Log Activity and Notify
       await api.createActivityLog({
         module: 'Applications',
         action: 'Chairman Final Approval',
@@ -55,12 +52,12 @@ export default function ChairmanDashboard() {
       });
 
       await api.createNotification({
-        title: 'Customer Activated',
-        message: `Chairman has given final approval for ${customer?.fullName || 'Customer'}. Account is now Active.`,
+        title: 'Application Forwarded to Finance',
+        message: `Chairman has given final approval for ${customer?.fullName || 'Customer'}. Forwarded to Finance queue.`,
         type: 'System'
       });
 
-      toast.success('Application Approved and Customer Activated!');
+      toast.success('Application Approved and Forwarded to Finance!');
       loadData();
     } catch (err: any) {
       toast.error(err.message || 'Failed to execute final approval');
@@ -79,10 +76,12 @@ export default function ChairmanDashboard() {
     </div>
   );
 
-  const pendingAllocations = allocations.filter(a => a.status === 'Pending Allocation').length;
+  const pendingAgreements = documents.filter(d => 
+    (d.type === 'Sale Agreement' || d.type === 'Offer Letter') && d.status === 'Pending Review'
+  ).length;
   const monthlyRevenue = revenue?.monthly || 0;
   const activeCustomers = customers.length; 
-  const pendingAppsForChairman = applications.filter(a => a.status === 'Director Reviewed');
+  const pendingAppsForChairman = applications.filter(a => a.status === 'Director Approved' || a.status === 'Awaiting Chairman Approval');
   const executiveReports = 5;
 
   return (
@@ -99,8 +98,8 @@ export default function ChairmanDashboard() {
             <h3 className="text-3xl font-extrabold">{pendingAppsForChairman.length}</h3>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-2"><Briefcase className="w-5 h-5 text-indigo-500"/><span className="text-sm font-bold text-gray-500 uppercase">Allocations</span></div>
-            <h3 className="text-3xl font-extrabold">{pendingAllocations}</h3>
+            <div className="flex items-center gap-2 mb-2"><Briefcase className="w-5 h-5 text-indigo-500"/><span className="text-sm font-bold text-gray-500 uppercase">Pending Agreements</span></div>
+            <h3 className="text-3xl font-extrabold">{pendingAgreements}</h3>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-2"><UsersIcon className="w-5 h-5 text-blue-500"/><span className="text-sm font-bold text-gray-500 uppercase">Customers</span></div>
@@ -139,9 +138,9 @@ export default function ChairmanDashboard() {
                         )}
                       </td>
                       <td className="p-4 text-right">
-                        <button onClick={() => handleFinalApproval(app)} className="text-xs font-bold px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors shadow-sm">
-                          Final Approval (Activate)
-                        </button>
+                        <Link href="/chairman/approvals" className="text-xs font-bold px-4 py-2 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] rounded-lg transition-colors shadow-sm">
+                          Review Application
+                        </Link>
                       </td>
                     </tr>
                   );

@@ -101,6 +101,21 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
+      if (role === 'Chairman') {
+        const restrictedChairmanRoutes = [
+          '/chairman/allocations',
+          '/chairman/finance',
+          '/chairman/payments',
+          '/chairman/projects',
+          '/chairman/leads'
+        ];
+        if (restrictedChairmanRoutes.some(r => pathname.startsWith(r))) {
+          const url = request.nextUrl.clone()
+          url.pathname = '/chairman'
+          return NextResponse.redirect(url)
+        }
+      }
+
       if (pathname.startsWith('/director') && role !== 'Director') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'

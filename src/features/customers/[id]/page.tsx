@@ -6,7 +6,7 @@ import { Customer } from '@/lib/types';
 import { User, Mail, Phone, MapPin, Briefcase, FileText, Calendar, CheckSquare, UploadCloud } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-export default function CustomerProfilePage({ params }: { params: { id: string } }) {
+export default function CustomerProfilePage({ params, readOnly = false }: { params: { id: string }, readOnly?: boolean }) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -44,9 +44,11 @@ export default function CustomerProfilePage({ params }: { params: { id: string }
           </h1>
           <p className="text-gray-500 font-medium mt-1">Ref: {customer.ref} &bull; Status: {customer.status}</p>
         </div>
-        <button onClick={() => toast.error('Create Application not implemented')} className="btn-primary flex items-center gap-2">
-          <FileText className="w-5 h-5" /> Create Application
-        </button>
+        {!readOnly && (
+          <button onClick={() => toast.error('Create Application not implemented')} className="btn-primary flex items-center gap-2">
+            <FileText className="w-5 h-5" /> Create Application
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -112,9 +114,11 @@ export default function CustomerProfilePage({ params }: { params: { id: string }
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex justify-between items-center mb-6 border-b pb-2">
               <h2 className="text-xl font-bold text-gray-900">Documents</h2>
-              <button onClick={() => toast.error('Document Upload not implemented')} className="text-[var(--color-primary)] font-bold text-sm flex items-center gap-1 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors">
-                <UploadCloud className="w-4 h-4" /> Upload Document
-              </button>
+              {!readOnly && (
+                <button onClick={() => toast.error('Document Upload not implemented')} className="text-[var(--color-primary)] font-bold text-sm flex items-center gap-1 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors">
+                  <UploadCloud className="w-4 h-4" /> Upload Document
+                </button>
+              )}
             </div>
             <div className="text-center py-8 text-gray-500">
               <p>No documents uploaded yet.</p>
