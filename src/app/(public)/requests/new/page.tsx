@@ -1,3 +1,4 @@
+"use client";
 import React from 'react';
 import PropertyRequestForm from '@/components/forms/PropertyRequestForm';
 

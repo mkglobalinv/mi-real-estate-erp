@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-import { getSupabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { Customer, Application, Allocation } from '@/lib/types';
 
 export default function PortalDashboard() {
@@ -19,7 +19,7 @@ export default function PortalDashboard() {
   useEffect(() => {
     async function loadUserData() {
       try {
-        const supabase = getSupabase();
+        const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (user && user.email) {
           const { data: cust } = await supabase.from('customers').select('*').eq('email', user.email).single();

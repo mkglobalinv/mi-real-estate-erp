@@ -1,3 +1,4 @@
+"use client";
 import SmartAdvisor from "@/components/SmartAdvisor";
 
 export default function AdvisorPage() {

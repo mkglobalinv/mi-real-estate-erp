@@ -1,3 +1,6 @@
+"use client";
+"use client";
+
 import React from 'react';
 import Link from 'next/link';
 import { CheckCircle, Clock, Wallet, FileText } from 'lucide-react';

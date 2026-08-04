@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import Image from 'next/image';
 import { Target, Lightbulb, Users, ShieldCheck } from 'lucide-react';
