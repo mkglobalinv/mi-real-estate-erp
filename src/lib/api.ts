@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapNotificationToDb, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapSearchAnalyticsToDb, mapDbToApplication, mapApplicationToDb } from './supabase-mappers';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb } from './supabase-mappers';
 import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
@@ -98,8 +98,6 @@ export const api = {
     }
   },
 
-
-  
   async updateLeadAssignment(id: string, assignedTo: string, notes: string, followUpDate: string): Promise<void> {
     const { error } = await getSupabase().from('leads').update({ 
       assigned_to: assignedTo, 
@@ -173,7 +171,7 @@ export const api = {
   },
 
   // --- APPLICATIONS ---
-  async getApplications(): Promise<any[]> {
+  async getApplications(): Promise<Application[]> {
     try {
       const { data, error } = await getSupabase().from('applications').select('*').order('created_at', { ascending: false });
       if (error) throw new Error(`Supabase error: ${error.message}`);
@@ -185,7 +183,7 @@ export const api = {
     }
   },
 
-  async saveApplication(app: any): Promise<any> {
+  async saveApplication(app: Partial<Application>): Promise<Application> {
     try {
       if (!app.id && !app.ref) {
         const { count, error: countErr } = await getSupabase().from('applications').select('*', { count: 'exact', head: true });
@@ -301,27 +299,61 @@ export const api = {
     }
   },
 
-  // TRANSACTIONAL PAYMENT VERIFICATION
-  async verifyPayment(proofId: string, amount: number, customerId: string, accountId: string, installmentNumber: number, issuedByProfileId: string, customReceiptNumber: string): Promise<void> {
+  // PAYMENT VERIFICATION
+  // NOTE: The original verify_payment_transaction RPC does not exist in the database.
+  // Replaced with sequential direct updates to prevent runtime crash.
+  // For full atomicity, deploy the verify_payment_transaction RPC to Supabase.
+  async verifyPayment(
+    proofId: string,
+    amount: number,
+    customerId: string,
+    accountId: string,
+    installmentNumber: number,
+    issuedByProfileId: string,
+    customReceiptNumber: string
+  ): Promise<void> {
+    const supabase = getSupabase();
     try {
-      // Execute the RPC for atomicity
-      const { error } = await getSupabase().rpc('verify_payment_transaction', {
-        p_proof_id: proofId,
-        p_amount: amount,
-        p_customer_id: customerId,
-        p_account_id: accountId,
-        p_installment_month: installmentNumber,
-        p_issued_by: issuedByProfileId,
-        p_receipt_number: customReceiptNumber
-      });
-      if (error) throw new Error(`Transaction Failed: ${error.message}`);
+      // 1. Mark payment proof as verified
+      const { error: proofError } = await supabase
+        .from('payment_proofs')
+        .update({
+          status: 'Verified',
+          verified_by: issuedByProfileId,
+          verified_at: new Date().toISOString(),
+        })
+        .eq('id', proofId);
+      if (proofError) throw new Error(`Failed to verify payment proof: ${proofError.message}`);
+
+      // 2. Create receipt
+      const { error: receiptError } = await supabase
+        .from('receipts')
+        .insert({
+          receipt_number: customReceiptNumber,
+          customer_id: customerId,
+          account_id: accountId,
+          amount,
+          issued_by: issuedByProfileId,
+          issued_date: new Date().toISOString(),
+          status: 'Issued',
+        });
+      if (receiptError) console.error('Receipt creation warning:', receiptError.message);
+
+      // 3. Mark the installment as paid
+      const { error: installError } = await supabase
+        .from('installments')
+        .update({ status: 'Paid', paid_date: new Date().toISOString() })
+        .eq('account_id', accountId)
+        .eq('installment_number', installmentNumber);
+      if (installError) console.error('Installment update warning:', installError.message);
+
     } catch (err) {
-      console.error('Payment verification transaction failed', err);
+      console.error('Payment verification failed', err);
       throw err;
     }
   },
 
-  // --- OPERATIONS (STAGE 3) ---
+  // --- OPERATIONS ---
   async getAllocations(): Promise<Allocation[]> {
     try {
       const { data, error } = await getSupabase().from('allocations').select('*').order('created_at', { ascending: false });
@@ -338,7 +370,7 @@ export const api = {
     try {
       // Basic check for existing plot allocation
       if (!alloc.id && alloc.projectId && alloc.blockNumber && alloc.plotNumber) {
-        const { count, error: countErr } = await supabase
+        const { count, error: countErr } = await getSupabase()
           .from('allocations')
           .select('*', { count: 'exact', head: true })
           .eq('project_id', alloc.projectId)
@@ -523,7 +555,8 @@ export const api = {
 
   async markNotificationRead(id: string): Promise<void> {
     try {
-      const { error } = await getSupabase().from('notifications').update({ is_read: true }).eq('id', id);
+      // DB column is read_status (NOT is_read — mapper bug)
+      const { error } = await getSupabase().from('notifications').update({ read_status: true }).eq('id', id);
       if (error) throw new Error(`Supabase error: ${error.message}`);
     } catch (err) {
       console.error('Failed to mark notification read', err);
@@ -531,7 +564,7 @@ export const api = {
     }
   },
 
-  // --- CAMPAIGNS (PHASE 6) ---
+  // --- CAMPAIGNS ---
   async getCampaigns(): Promise<Campaign[]> {
     const { data, error } = await getSupabase().from('campaigns').select('*, lead_submissions(count), campaign_analytics(count)').order('created_at', { ascending: false });
     if (!error && data) return data.map(mapDbToCampaign);
@@ -600,7 +633,7 @@ export const api = {
     if (error) throw error;
   },
 
-  // --- EVENT TRACKING & SUBMISSIONS (SUPABASE INTEGRATED) ---
+  // --- EVENT TRACKING & SUBMISSIONS ---
   async trackCampaignEvent(campaignId: string, eventType: string): Promise<void> {
     try {
       const { error } = await getSupabase().from('campaign_analytics').insert({
@@ -613,8 +646,7 @@ export const api = {
     }
   },
 
-  async submitCampaignLead(campaignId: string, leadData: any, answers: any[], scoreData: any): Promise<any> {
-    // 1. Save Lead Submission
+  async submitCampaignLead(campaignId: string, leadData: Record<string, unknown>, answers: Array<{ questionId: string; answerText: string }>, scoreData: { score: number; category: string; readiness?: string; timeline?: string }): Promise<{ submission: unknown; score: unknown }> {
     const { data: submissionData, error: subError } = await getSupabase().from('lead_submissions').insert({
       campaign_id: campaignId,
       name: leadData.name,
@@ -625,9 +657,8 @@ export const api = {
 
     if (subError) throw new Error(`Failed to save lead submission: ${subError.message}`);
 
-    const leadId = submissionData.id;
+    const leadId = (submissionData as { id: string }).id;
 
-    // 2. Save Answers
     if (answers && answers.length > 0) {
       const answersPayload = answers.map(a => ({
         lead_id: leadId,
@@ -638,7 +669,6 @@ export const api = {
       if (ansError) console.error('Supabase lead_answers error:', ansError);
     }
 
-    // 3. Save Score
     const { error: scoreError } = await getSupabase().from('lead_scores').insert({
       lead_id: leadId,
       score: scoreData.score,
@@ -646,22 +676,12 @@ export const api = {
     });
     if (scoreError) console.error('Supabase lead_scores error:', scoreError);
 
-    // 4. Create CRM Lead Record
-    // Retrieve the campaign name for CRM records
     const campaign = await this.getCampaignById(campaignId);
     
     const answersSummary = answers.map(a => `- ${a.answerText}`).join('\n');
-    const notesSummary = `[CAMPAIGN LEAD: ${campaign?.name || 'Unknown Campaign'}]
-Category: ${scoreData.category} (${scoreData.score} pts)
-Readiness: ${scoreData.readiness}
-Timeline: ${scoreData.timeline}
-
-Answers:
-${answersSummary}`;
+    const notesSummary = `[CAMPAIGN LEAD: ${campaign?.name || 'Unknown Campaign'}]\nCategory: ${scoreData.category} (${scoreData.score} pts)\nReadiness: ${scoreData.readiness ?? 'N/A'}\nTimeline: ${scoreData.timeline ?? 'N/A'}\n\nAnswers:\n${answersSummary}`;
 
     try {
-      // Use standard CRM createLead which might eventually use Supabase
-      // For now, mapping explicitly for direct Supabase insert
       const { error: crmError } = await getSupabase().from('leads').insert({
         ref: `MIRE-LD-${Date.now().toString().slice(-6)}`,
         name: leadData.name,
@@ -684,7 +704,7 @@ ${answersSummary}`;
     return { submission: submissionData, score: scoreData };
   },
 
-  async getCampaignAnalyticsEvents(campaignId?: string): Promise<any[]> {
+  async getCampaignAnalyticsEvents(campaignId?: string): Promise<unknown[]> {
     let query = getSupabase().from('campaign_analytics').select('*');
     if (campaignId) query = query.eq('campaign_id', campaignId);
     const { data, error } = await query;
@@ -692,7 +712,7 @@ ${answersSummary}`;
     return [];
   },
 
-  async getTickets(): Promise<any[]> {
+  async getTickets(): Promise<CustomerCareTicket[]> {
     return this.getCustomerCareTickets();
   },
 
@@ -701,6 +721,7 @@ ${answersSummary}`;
     if (error) throw new Error(error.message);
     return data ? data.map(mapDbToWebsiteEnquiry) : [];
   },
+
   async submitWebsiteEnquiry(payload: Partial<WebsiteEnquiry>): Promise<WebsiteEnquiry> {
     const { data, error } = await getSupabase().from('website_enquiries').insert(mapWebsiteEnquiryToDb(payload)).select().single();
     if (error) throw new Error(error.message);
@@ -712,6 +733,7 @@ ${answersSummary}`;
     if (error) throw new Error(error.message);
     return data ? data.map(mapDbToAnnouncement) : [];
   },
+
   async saveAnnouncement(payload: Partial<Announcement>): Promise<Announcement> {
     const { data, error } = await getSupabase().from('announcements').upsert(mapAnnouncementToDb(payload)).select().single();
     if (error) throw new Error(error.message);
@@ -733,8 +755,7 @@ ${answersSummary}`;
     return data ? mapDbToOfficeInfo(data) : { id: 'd3b07384-d113-4ec2-a5e6-df06d3e69f8c', address: '', phone1: '', phone2: '', whatsapp: '', email1: '', email2: '', mapsLink: '', businessHours: '' } as OfficeInfo;
   },
 
-  async getRevenueReports(): Promise<any> {
-    // Generate dynamically from ledger_transactions
+  async getRevenueReports(): Promise<{ monthly: number; yearly: number; total: number }> {
     const { data, error } = await getSupabase().from('ledger_transactions').select('amount, type');
     if (error) return { monthly: 0, yearly: 0, total: 0 };
     let total = 0;
@@ -756,16 +777,16 @@ ${answersSummary}`;
     return data ? data.map(mapDbToSearchAnalytics) : [];
   },
 
-  async getDefaulters(): Promise<{ totalDefaulters: number; days30: number; days60: number; days90Plus: number; defaulterAccounts: any[] }> {
+  async getDefaulters(): Promise<{ totalDefaulters: number; days30: number; days60: number; days90Plus: number; defaulterAccounts: unknown[] }> {
     const today = new Date();
-    const { data: installments, error } = await supabase
+    const { data: installments, error } = await getSupabase()
       .from('installments')
       .select('*, easy_buy_accounts(*)')
       .in('status', ['Overdue', 'Pending']);
 
     if (error || !installments) return { totalDefaulters: 0, days30: 0, days60: 0, days90Plus: 0, defaulterAccounts: [] };
 
-    const accountMap = new Map<string, { account: any; maxDaysLate: number }>();
+    const accountMap = new Map<string, { account: unknown; maxDaysLate: number }>();
 
     for (const inst of installments) {
       if (!inst.due_date) continue;
@@ -779,7 +800,7 @@ ${answersSummary}`;
     }
 
     let days30 = 0, days60 = 0, days90Plus = 0;
-    const defaulterAccounts: any[] = [];
+    const defaulterAccounts: unknown[] = [];
 
     for (const [, val] of accountMap) {
       defaulterAccounts.push(val);
@@ -793,7 +814,7 @@ ${answersSummary}`;
 
   // --- LEADS: ASSIGN ---
   async assignLead(id: string, assignedTo: string): Promise<Lead> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('leads')
       .update({ assigned_to: assignedTo })
       .eq('id', id)
@@ -805,7 +826,7 @@ ${answersSummary}`;
 
   // --- TASKS: STATUS ---
   async updateTaskStatus(id: string, status: Task['status']): Promise<Task> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('tasks')
       .update({ status })
       .eq('id', id)
@@ -823,7 +844,7 @@ ${answersSummary}`;
 
   // --- RESERVATIONS: STATUS ---
   async updateReservationStatus(id: string, status: Reservation['status']): Promise<Reservation> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('reservations')
       .update({ status })
       .eq('id', id)
@@ -834,7 +855,7 @@ ${answersSummary}`;
   },
 
   async updateReservationAllocationStatus(id: string, allocationStatus: string): Promise<Reservation> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('reservations')
       .update({ allocation_status: allocationStatus })
       .eq('id', id)
@@ -863,22 +884,22 @@ ${answersSummary}`;
   },
 
   // --- PROPERTY SUBMISSIONS ---
-  async getSubmissions(): Promise<any[]> {
+  async getSubmissions(): Promise<unknown[]> {
     const { data, error } = await getSupabase().from('property_submissions').select('*').order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
   },
 
-  async createSubmission(payload: any): Promise<any> {
+  async createSubmission(payload: Record<string, unknown>): Promise<unknown> {
     const { data, error } = await getSupabase().from('property_submissions').insert(payload).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
 
-  async updateSubmissionStatus(id: string, status: string): Promise<any> {
-    const { data, error } = await supabase
+  async updateSubmissionStatus(id: string, status: string): Promise<unknown> {
+    const { data, error } = await getSupabase()
       .from('property_submissions')
-      .update({ status, assigned_to: undefined })
+      .update({ status })
       .eq('id', id)
       .select()
       .single();
@@ -887,20 +908,20 @@ ${answersSummary}`;
   },
 
   // --- PROPERTY REQUESTS ---
-  async getRequests(): Promise<any[]> {
+  async getRequests(): Promise<unknown[]> {
     const { data, error } = await getSupabase().from('property_requests').select('*').order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
   },
 
-  async createRequest(payload: any): Promise<any> {
+  async createRequest(payload: Record<string, unknown>): Promise<unknown> {
     const { data, error } = await getSupabase().from('property_requests').insert(payload).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
 
-  async updateRequestStatus(id: string, status: string): Promise<any> {
-    const { data, error } = await supabase
+  async updateRequestStatus(id: string, status: string): Promise<unknown> {
+    const { data, error } = await getSupabase()
       .from('property_requests')
       .update({ status })
       .eq('id', id)
@@ -911,7 +932,7 @@ ${answersSummary}`;
   },
 
   // --- DOCUMENTS ---
-  async getDocuments(customerId?: string): Promise<any[]> {
+  async getDocuments(customerId?: string): Promise<unknown[]> {
     let query = getSupabase().from('documents').select('*').order('generated_date', { ascending: false });
     if (customerId) query = query.eq('customer_id', customerId);
     const { data, error } = await query;
@@ -919,7 +940,7 @@ ${answersSummary}`;
     return data || [];
   },
 
-  async saveDocument(doc: any): Promise<any> {
+  async saveDocument(doc: Record<string, unknown>): Promise<unknown> {
     const { data, error } = await getSupabase().from('documents').upsert(doc).select().single();
     if (error) throw new Error(error.message);
     return data;
@@ -927,7 +948,7 @@ ${answersSummary}`;
 
   // --- PROJECTS: TOGGLE STATUS ---
   async updateProjectStatus(id: string, active: boolean): Promise<Project> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('projects')
       .update({ active })
       .eq('id', id)
@@ -939,7 +960,7 @@ ${answersSummary}`;
 
   // --- INSPECTIONS: UPDATE ---
   async updateInspectionStatus(id: string, status: InspectionBooking['status']): Promise<InspectionBooking> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('inspections')
       .update({ status })
       .eq('id', id)
@@ -950,7 +971,7 @@ ${answersSummary}`;
   },
 
   async updateInspectionAssignment(id: string, assignedTo: string): Promise<InspectionBooking> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('inspections')
       .update({ assigned_to: assignedTo })
       .eq('id', id)
@@ -968,7 +989,7 @@ ${answersSummary}`;
 
   // --- LEADS: UPDATE STATUS ---
   async updateLeadStatus(id: string, status: Lead['status']): Promise<Lead> {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('leads')
       .update({ status })
       .eq('id', id)
@@ -981,15 +1002,12 @@ ${answersSummary}`;
   // --- LEADS: CONVERT TO CUSTOMER ---
   async convertLeadToCustomer(leadId: string): Promise<Customer> {
     const supabase = getSupabase();
-    // 1. Fetch Lead
     const { data: leadData, error: leadError } = await supabase.from('leads').select('*').eq('id', leadId).single();
     if (leadError) throw new Error(`Lead fetch failed: ${leadError.message}`);
     
-    // 2. Generate new Customer Ref (We use a random number for now or query max count)
     const refCount = Math.floor(Math.random() * 10000);
     const customerRef = generateCustomerRef(refCount);
     
-    // 3. Create Customer
     const newCustomer = {
       ref: customerRef,
       full_name: leadData.name,
@@ -1003,14 +1021,13 @@ ${answersSummary}`;
     const { data: customerData, error: custError } = await supabase.from('customers').insert(newCustomer).select().single();
     if (custError) throw new Error(`Customer creation failed: ${custError.message}`);
     
-    // 4. Update Lead status to 'Closed Won'
     await supabase.from('leads').update({ status: 'Closed Won' }).eq('id', leadId);
     
     return mapDbToCustomer(customerData);
   },
 
   // --- TESTIMONIALS ---
-  async saveTestimonial(payload: any): Promise<any> {
+  async saveTestimonial(payload: Partial<Testimonial>): Promise<Testimonial> {
     const { data, error } = await getSupabase().from('testimonials').upsert(mapTestimonialToDb(payload)).select().single();
     if (error) throw new Error(error.message);
     return mapDbToTestimonial(data);
@@ -1022,8 +1039,8 @@ ${answersSummary}`;
   },
 
   // --- WEBSITE ENQUIRIES ---
-  async updateWebsiteEnquiryStatus(id: string, status: string): Promise<any> {
-    const { data, error } = await supabase
+  async updateWebsiteEnquiryStatus(id: string, status: string): Promise<WebsiteEnquiry> {
+    const { data, error } = await getSupabase()
       .from('website_enquiries')
       .update({ status })
       .eq('id', id)
@@ -1039,8 +1056,6 @@ ${answersSummary}`;
   },
 
   // --- OFFICE INFO: UPDATE ---
-  // Uses a server-side API route to bypass browser RLS restrictions on office_info.
-  // The server route authenticates the user via cookies and validates Super Admin role.
   async updateOfficeInfo(payload: Partial<OfficeInfo>): Promise<OfficeInfo> {
     const response = await fetch('/api/admin/office-info', {
       method: 'POST',
@@ -1051,14 +1066,17 @@ ${answersSummary}`;
       const err = await response.json().catch(() => ({ error: 'Unknown error' }));
       throw new Error(err.error || `HTTP ${response.status}`);
     }
-    return response.json();
+    return response.json() as Promise<OfficeInfo>;
   },
 
   // --- LOGGING & NOTIFICATIONS ---
+  // NOTE: For targeted notifications (specific user), call createClient() directly
+  // in your page component and look up profile IDs by role. This function inserts
+  // a notification for a specific user when userId is provided.
   async createActivityLog(log: Partial<ActivityLog>): Promise<void> {
     try {
       const { error } = await getSupabase().from('activity_logs').insert([{
-        user_id: log.userId,
+        user_id: log.userId ?? null,
         module: log.module,
         action: log.action,
         details: log.details || {}
@@ -1069,13 +1087,14 @@ ${answersSummary}`;
     }
   },
 
-  async createNotification(notification: Partial<Notification>): Promise<void> {
+  async createNotification(notification: Partial<Notification> & { userId?: string }): Promise<void> {
     try {
       const { error } = await getSupabase().from('notifications').insert([{
-        user_id: notification.userId,
+        user_id: notification.userId ?? null,
         title: notification.title,
         message: notification.message,
-        type: notification.type || 'System'
+        type: notification.type || 'System',
+        read_status: false, // correct DB column name
       }]);
       if (error) console.error('Notification Error:', error);
     } catch (e) {
