@@ -17,12 +17,13 @@ export default function ArchivePage() {
       try {
         const apps = await api.getApplications();
         const custs = await api.getCustomers();
-        
-        // Archive only shows Chairman Approved apps and Active/Closed customers
+
+        // Archive only shows Chairman Approved applications
         setApplications(apps.filter(a => a.status === 'Chairman Approved'));
         setCustomers(custs);
-      } catch (err: any) {
-        toast.error('Failed to load archive: ' + err.message);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to load archive';
+        toast.error('Failed to load archive: ' + msg);
       } finally {
         setLoading(false);
       }
@@ -31,35 +32,44 @@ export default function ArchivePage() {
   }, []);
 
   if (loading) {
-    return <div className="p-8 animate-pulse text-gray-500">Loading Archive Data...</div>;
+    return (
+      <div className="p-8 flex items-center gap-3 text-gray-500">
+        <div className="h-6 w-6 rounded-full border-4 border-gray-300 border-t-transparent animate-spin" />
+        Loading Archive Data...
+      </div>
+    );
   }
 
-  const filteredApps = applications.filter(a => 
+  const filteredApps = applications.filter(a =>
     a.ref.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 flex items-center gap-3">
-            <ArchiveIcon className="w-8 h-8 text-gray-700" />
-            Completed Workflows
-          </h1>
-          <p className="text-gray-500 mt-1">Read-only view of all approved applications and activated customers.</p>
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gray-100 rounded-xl">
+            <ArchiveIcon className="w-6 h-6 text-gray-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900">Completed Workflows</h1>
+            <p className="text-gray-500 text-sm">
+              Read-only view of all approved applications and activated customers.
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden opacity-90">
-        <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex gap-4">
-          <div className="relative flex-1">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 bg-gray-50">
+          <div className="relative max-w-sm">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by Application No..."
+              placeholder="Search by application reference..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent bg-gray-50"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-300 focus:border-transparent bg-gray-50 text-sm"
             />
           </div>
         </div>
@@ -67,7 +77,7 @@ export default function ArchivePage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-100 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500">
+              <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500">
                 <th className="p-4 font-bold">App No.</th>
                 <th className="p-4 font-bold">Customer Name</th>
                 <th className="p-4 font-bold">Workflow Status</th>
@@ -77,7 +87,7 @@ export default function ArchivePage() {
             <tbody className="divide-y divide-gray-100">
               {filteredApps.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
+                  <td colSpan={4} className="p-8 text-center text-gray-500 text-sm">
                     No completed applications in archive.
                   </td>
                 </tr>
@@ -86,14 +96,16 @@ export default function ArchivePage() {
                   const customer = customers.find(c => c.id === app.customerId);
                   return (
                     <tr key={app.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-bold text-gray-600">{app.ref}</td>
-                      <td className="p-4 text-gray-600">{customer?.fullName || 'Unknown'}</td>
+                      <td className="p-4 font-bold text-gray-900">{app.ref}</td>
+                      <td className="p-4 text-gray-700">{customer?.fullName || 'Unknown'}</td>
                       <td className="p-4">
-                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
                           {app.status}
                         </span>
                       </td>
-                      <td className="p-4 text-gray-500 text-sm">{new Date(app.createdAt).toLocaleDateString()}</td>
+                      <td className="p-4 text-gray-500 text-sm">
+                        {new Date(app.createdAt).toLocaleDateString()}
+                      </td>
                     </tr>
                   );
                 })
