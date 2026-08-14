@@ -1,139 +1,143 @@
 "use client";
 
-import React, { useState } from 'react';
-import { 
-  FileText, Download, Folder, File, ChevronRight, Lock, Stamp
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Download, Lock, Loader2, FolderOpen } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+
+interface DocumentRow {
+  id: string;
+  title: string;
+  type: string;
+  file_url: string | null;
+  generated_date: string | null;
+}
 
 export default function PortalDocuments() {
-  
-  interface DocumentFile {
-    id: number;
-    name: string;
-    date: string;
-    type: string;
-    size: string;
-    secure: boolean;
-    locked?: boolean;
-  }
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  interface DocumentGroup {
-    category: string;
-    description: string;
-    icon: React.ReactNode;
-    color: string;
-    border: string;
-    files: DocumentFile[];
-  }
+  useEffect(() => {
+    async function loadDocs() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) { setLoading(false); return; }
 
-  // Grouped documents for the UI prototype
-  const documentGroups: DocumentGroup[] = [
-    {
-      category: "Registration Documents",
-      description: "Your official profile and onboarding files.",
-      icon: <Folder className="w-5 h-5 text-indigo-500" />,
-      color: "bg-indigo-50",
-      border: "border-indigo-100",
-      files: [
-        { id: 1, name: "Customer Registration Form", date: "Jan 10, 2025", type: "PDF", size: "1.2 MB", secure: false },
-        { id: 2, name: "Customer Profile Verification", date: "Jan 12, 2025", type: "PDF", size: "0.8 MB", secure: true }
-      ]
-    },
-    {
-      category: "Financial Documents",
-      description: "Payment receipts and account statements.",
-      icon: <Folder className="w-5 h-5 text-emerald-500" />,
-      color: "bg-emerald-50",
-      border: "border-emerald-100",
-      files: [
-        { id: 3, name: "Initial Deposit Receipt", date: "Jan 10, 2025", type: "PDF", size: "0.5 MB", secure: false },
-        { id: 4, name: "Account Statement (Q1 2025)", date: "Apr 01, 2025", type: "PDF", size: "1.5 MB", secure: false },
-        { id: 5, name: "Installment 4 Receipt", date: "May 12, 2025", type: "PDF", size: "0.5 MB", secure: false }
-      ]
-    },
-    {
-      category: "Allocation Documents",
-      description: "Official site plans and allocation letters.",
-      icon: <Folder className="w-5 h-5 text-blue-500" />,
-      color: "bg-blue-50",
-      border: "border-blue-100",
-      files: [
-        { id: 6, name: "Provisional Allocation Letter", date: "Feb 05, 2025", type: "PDF", size: "2.1 MB", secure: true },
-        { id: 7, name: "Block C Site Plan", date: "Feb 05, 2025", type: "PDF", size: "4.5 MB", secure: false }
-      ]
-    },
-    {
-      category: "Legal Documents",
-      description: "Agreements and ownership documentation.",
-      icon: <Folder className="w-5 h-5 text-amber-500" />,
-      color: "bg-amber-50",
-      border: "border-amber-100",
-      files: [
-        { id: 8, name: "Contract of Sale", date: "Pending Completion", type: "PDF", size: "--", secure: true, locked: true },
-        { id: 9, name: "Deed of Assignment", date: "Pending Completion", type: "PDF", size: "--", secure: true, locked: true }
-      ]
+        // Resolve customer by email
+        const { data: customer } = await supabase
+          .from('customers').select('id').eq('email', user.email).maybeSingle();
+        if (!customer) { setLoading(false); return; }
+
+        // Fetch their documents
+        const { data: docs } = await supabase
+          .from('documents')
+          .select('id, title, type, file_url, generated_date')
+          .eq('customer_id', customer.id)
+          .order('generated_date', { ascending: false });
+
+        setDocuments(docs ?? []);
+      } catch (err: unknown) {
+        console.error('Failed to load documents', err);
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    loadDocs();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center gap-3 text-gray-500">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Loading documents...
+      </div>
+    );
+  }
+
+  // Group documents by type
+  const grouped = documents.reduce<Record<string, DocumentRow[]>>((acc, doc) => {
+    const key = doc.type || 'Other';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(doc);
+    return acc;
+  }, {});
+
+  const typeColor: Record<string, string> = {
+    'Registration': 'bg-indigo-50 border-indigo-100',
+    'Financial': 'bg-emerald-50 border-emerald-100',
+    'Allocation': 'bg-blue-50 border-blue-100',
+    'Legal': 'bg-amber-50 border-amber-100',
+    'Other': 'bg-gray-50 border-gray-100',
+  };
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto pb-24">
-      
-      <div className="mb-8 border-b border-gray-200 pb-6">
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
-          <Stamp className="w-8 h-8 text-[var(--color-primary)]" />
-          Document Center
-        </h1>
-        <p className="text-gray-500 font-medium mt-2 max-w-2xl">
-          Secure access to all your official files. Documents marked with a lock require your secure PIN to download.
-        </p>
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="p-3 bg-indigo-100 rounded-xl">
+          <FolderOpen className="w-6 h-6 text-indigo-600" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-extrabold text-gray-900">Document Center</h1>
+          <p className="text-gray-500 text-sm">
+            Secure access to all your official files.
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {documentGroups.map((group, idx) => (
-          <div key={idx} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className={`p-6 border-b ${group.border} ${group.color} flex items-center gap-4`}>
-              <div className="bg-white p-3 rounded-xl shadow-sm">
-                {group.icon}
-              </div>
-              <div>
-                <h2 className="text-lg font-extrabold text-gray-900">{group.category}</h2>
-                <p className="text-xs text-gray-600 font-medium mt-0.5">{group.description}</p>
-              </div>
+      {documents.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-12 text-center">
+          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-gray-700 font-bold text-lg mb-1">No documents yet</h3>
+          <p className="text-gray-400 text-sm">
+            Your documents will appear here once they are generated by the office.
+          </p>
+        </div>
+      ) : (
+        Object.entries(grouped).map(([type, docs]) => (
+          <div
+            key={type}
+            className={`rounded-2xl border shadow-sm overflow-hidden ${typeColor[type] ?? typeColor['Other']}`}
+          >
+            <div className="px-6 py-4 border-b border-inherit">
+              <h2 className="font-bold text-gray-800 text-sm">{type} Documents</h2>
+              <p className="text-xs text-gray-500">{docs.length} file{docs.length !== 1 ? 's' : ''}</p>
             </div>
-            
-            <div className="divide-y divide-gray-50">
-              {group.files.map((file) => (
-                <div key={file.id} className="p-5 flex items-center justify-between hover:bg-gray-50 transition-colors group">
-                  <div className="flex items-center gap-4">
-                    <File className={`w-8 h-8 ${file.locked ? 'text-gray-300' : 'text-[var(--color-primary)] opacity-80'}`} />
-                    <div>
-                      <p className={`text-sm font-bold flex items-center gap-2 ${file.locked ? 'text-gray-400' : 'text-gray-900'}`}>
-                        {file.name}
-                        {file.secure && !file.locked && <Lock className="w-3 h-3 text-amber-500" />}
-                      </p>
-                      <p className="text-[10px] text-gray-500 font-mono mt-1">
-                        {file.locked ? 'Available upon completion' : `${file.date} • ${file.size}`}
+            <div className="divide-y divide-white/60">
+              {docs.map(doc => (
+                <div key={doc.id} className="flex items-center justify-between px-6 py-3.5 bg-white/60 hover:bg-white/90 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-800 truncate">{doc.title}</p>
+                      <p className="text-xs text-gray-400">
+                        {doc.generated_date
+                          ? new Date(doc.generated_date).toLocaleDateString()
+                          : 'Date not set'}
                       </p>
                     </div>
                   </div>
-                  
-                  <button 
-                    disabled={file.locked}
-                    className={`p-2 rounded-lg transition-colors ${
-                      file.locked 
-                        ? 'text-gray-300 bg-gray-50 cursor-not-allowed' 
-                        : 'text-gray-400 hover:text-[var(--color-primary)] hover:bg-green-50 bg-white border border-gray-100 shadow-sm'
-                    }`}
-                  >
-                    {file.locked ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-                  </button>
+                  {doc.file_url ? (
+                    <a
+                      href={doc.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-primary)] hover:underline flex-shrink-0 ml-4"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0 ml-4">
+                      <Lock className="w-3.5 h-3.5" />
+                      Pending
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
-        ))}
-      </div>
-      
+        ))
+      )}
     </div>
   );
 }
