@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb } from './supabase-mappers';
-import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location } from './types';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb } from './supabase-mappers';
+import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
 
@@ -631,6 +631,36 @@ export const api = {
   async deleteCampaignFaq(id: string): Promise<void> {
     const { error } = await getSupabase().from('campaign_faqs').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  // --- APPLICATION FORM TEMPLATES (Landing Page Agent: pre-application form config) ---
+  async getApplicationFormTemplates(): Promise<ApplicationFormTemplate[]> {
+    const { data, error } = await getSupabase().from('application_form_templates').select('*').order('created_at', { ascending: false });
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data ? data.map(mapDbToApplicationFormTemplate) : [];
+  },
+
+  async saveApplicationFormTemplate(template: Partial<ApplicationFormTemplate>): Promise<ApplicationFormTemplate> {
+    const mapped = mapApplicationFormTemplateToDb(template);
+    const { data, error } = await getSupabase().from('application_form_templates').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToApplicationFormTemplate(data);
+  },
+
+  // --- CAMPAIGN AI DRAFTS (Landing Page Agent: AI Builder draft -> review -> approve) ---
+  async getCampaignAiDrafts(campaignId?: string): Promise<CampaignAiDraft[]> {
+    let query = getSupabase().from('campaign_ai_drafts').select('*').order('created_at', { ascending: false });
+    if (campaignId) query = query.eq('campaign_id', campaignId);
+    const { data, error } = await query;
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data ? data.map(mapDbToCampaignAiDraft) : [];
+  },
+
+  async saveCampaignAiDraft(draft: Partial<CampaignAiDraft>): Promise<CampaignAiDraft> {
+    const mapped = mapCampaignAiDraftToDb(draft);
+    const { data, error } = await getSupabase().from('campaign_ai_drafts').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToCampaignAiDraft(data);
   },
 
   // --- EVENT TRACKING & SUBMISSIONS ---
