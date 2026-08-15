@@ -33,7 +33,11 @@ export default function CampaignForm({ initialData, isEdit, basePath = '/admin' 
       whatsappNumber: '',
       preApplicationEnabled: false,
       applicationFormTemplateId: '',
-      preApplicationPrompt: ''
+      preApplicationPrompt: '',
+      hotThreshold: 90,
+      warmThreshold: 60,
+      termsAndConditions: '',
+      termsAndConditionsHausa: ''
     }
   );
 
@@ -262,6 +266,64 @@ export default function CampaignForm({ initialData, isEdit, basePath = '/admin' 
             </div>
           </div>
         )}
+      </div>
+
+      <div className="border-t border-gray-100 pt-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Qualification Settings</h3>
+        <p className="text-sm text-gray-500 mb-4">Set the minimum scores required for lead categories.</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Hot Lead Threshold</label>
+            <input
+              type="number"
+              name="hotThreshold"
+              value={formData.hotThreshold ?? 90}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Warm Lead Threshold</label>
+            <input
+              type="number"
+              name="warmThreshold"
+              value={formData.warmThreshold ?? 60}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-100 pt-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Terms & Conditions</h3>
+        <p className="text-sm text-gray-500 mb-4">Display these terms on the public campaign page.</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">English Terms</label>
+            <textarea
+              name="termsAndConditions"
+              rows={4}
+              value={formData.termsAndConditions || ''}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none"
+              placeholder="Terms and conditions..."
+            ></textarea>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Hausa Terms</label>
+            <textarea
+              name="termsAndConditionsHausa"
+              rows={4}
+              value={formData.termsAndConditionsHausa || ''}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none"
+              placeholder="Hausa terms and conditions..."
+            ></textarea>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-end gap-4 mt-8 pt-4 border-t border-gray-100">

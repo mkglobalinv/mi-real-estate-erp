@@ -1,55 +1,39 @@
-export function calculateLeadScore(answers: { questionText: string; answerText: string }[]): { score: number; category: 'Hot' | 'Warm' | 'Cold'; readiness: string; timeline: string } {
+import { CampaignQuestion, Campaign } from './types';
+
+export function calculateLeadScore(
+  answers: { questionId: string; questionText: string; answerText: string }[],
+  questions: CampaignQuestion[],
+  campaign: Campaign
+): { score: number; category: 'Hot' | 'Warm' | 'Cold'; readiness: string; timeline: string } {
   let score = 20; // Base score for completing the qualification
 
   let readiness = 'Not Specified';
   let timeline = 'Not Specified';
 
-  // We perform heuristic string matching to find standard question intents
+  // Data-driven calculation based on configured option scores
   answers.forEach(a => {
-    const qLower = a.questionText.toLowerCase();
-    const ansLower = a.answerText.toLowerCase();
-
-    // Ready to start payment (+40)
-    if (qLower.includes('ready to start') || qLower.includes('payment') || qLower.includes('ready to proceed')) {
-      if (ansLower.includes('yes') || ansLower.includes('ready') || ansLower.includes('immediately')) {
-        score += 40;
-        readiness = 'Ready';
-      } else {
-        readiness = 'Not Ready';
+    const q = questions.find(q => q.id === a.questionId);
+    if (q) {
+      // Find the index of the selected answer in either English or Hausa options
+      let optIdx = -1;
+      if (q.options) {
+        optIdx = q.options.findIndex(opt => opt === a.answerText);
       }
-    }
-
-    // Can pay form fee (+20)
-    if (qLower.includes('form fee') || qLower.includes('registration fee')) {
-      if (ansLower.includes('yes') || ansLower.includes('can pay') || ansLower.includes('ready')) {
-        score += 20;
+      if (optIdx === -1 && q.optionsHausa) {
+        optIdx = q.optionsHausa.findIndex(opt => opt === a.answerText);
       }
-    }
 
-    // Timeline (+20 / +15 / +10)
-    if (qLower.includes('timeline') || qLower.includes('when') || qLower.includes('how soon')) {
-      if (ansLower.includes('immediate') || ansLower.includes('now') || ansLower.includes('1 week')) {
-        score += 20;
-        timeline = 'Immediate';
-      } else if (ansLower.includes('30 days') || ansLower.includes('1 month') || ansLower.includes('few weeks')) {
-        score += 15;
-        timeline = 'Within 30 Days';
-      } else if (ansLower.includes('90 days') || ansLower.includes('3 months')) {
-        score += 10;
-        timeline = 'Within 90 Days';
-      } else {
-        timeline = 'Future';
+      // Add the score configured for this option, if available
+      if (optIdx !== -1 && q.optionsScores && q.optionsScores[optIdx] !== undefined) {
+        score += q.optionsScores[optIdx];
       }
-    }
-
-    // Budget match (+20)
-    if (qLower.includes('budget') || qLower.includes('how much')) {
-      // Assuming if they answered a budget question with anything other than 'I don't have' or 'None', it's a match.
-      // In a real strict system, we'd compare against campaign minimum budget.
-      if (ansLower.includes('don\'t') || ansLower.includes('none') || ansLower.includes('zero')) {
-        // no match
-      } else {
-        score += 20;
+      
+      // Still populate readiness and timeline if standard keys exist
+      if (q.questionKey === 'readiness') {
+        readiness = a.answerText;
+      }
+      if (q.questionKey === 'timeline') {
+        timeline = a.answerText;
       }
     }
   });
@@ -57,10 +41,13 @@ export function calculateLeadScore(answers: { questionText: string; answerText: 
   // Cap score at 100
   score = Math.min(score, 100);
 
+  const hotThreshold = campaign.hotThreshold ?? 90;
+  const warmThreshold = campaign.warmThreshold ?? 60;
+
   let category: 'Hot' | 'Warm' | 'Cold' = 'Cold';
-  if (score >= 90) {
+  if (score >= hotThreshold) {
     category = 'Hot';
-  } else if (score >= 60) {
+  } else if (score >= warmThreshold) {
     category = 'Warm';
   } else {
     category = 'Cold';
@@ -68,3 +55,4 @@ export function calculateLeadScore(answers: { questionText: string; answerText: 
 
   return { score, category, readiness, timeline };
 }
+

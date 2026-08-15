@@ -474,3 +474,40 @@ CREATE TABLE IF NOT EXISTS public.campaign_ai_drafts (
 -- ============================================================================
 ALTER TABLE public.lead_submissions
   ADD COLUMN IF NOT EXISTS lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL;
+
+-- ============================================================================
+-- 27. CAMPAIGN BUILDER — PHASE 2 FULLY DATA-DRIVEN
+-- Additive extensions for campaign packages, translations, and scoring.
+-- ============================================================================
+
+-- 27.1 Campaign extensions (thresholds and terms)
+ALTER TABLE public.campaigns
+  ADD COLUMN IF NOT EXISTS hot_threshold INTEGER DEFAULT 90,
+  ADD COLUMN IF NOT EXISTS warm_threshold INTEGER DEFAULT 60,
+  ADD COLUMN IF NOT EXISTS terms_and_conditions TEXT,
+  ADD COLUMN IF NOT EXISTS terms_and_conditions_hausa TEXT,
+  ADD COLUMN IF NOT EXISTS cancellation_rules TEXT,
+  ADD COLUMN IF NOT EXISTS cancellation_rules_hausa TEXT;
+
+-- 27.2 Campaign Packages (Plot sizes, pricing, durations)
+CREATE TABLE IF NOT EXISTS public.campaign_packages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id UUID REFERENCES public.campaigns(id) ON DELETE CASCADE,
+    name TEXT NOT NULL, -- e.g., "40x40 Plot"
+    name_hausa TEXT,
+    outright_price NUMERIC NOT NULL DEFAULT 0,
+    initial_deposit NUMERIC NOT NULL DEFAULT 0,
+    monthly_installment NUMERIC NOT NULL DEFAULT 0,
+    duration_months INTEGER NOT NULL DEFAULT 0,
+    description TEXT,
+    description_hausa TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 27.3 Campaign Questions extensions (translations and scoring)
+-- options_hausa is a JSON array of strings matching the English options array length
+-- options_scores is a JSON array of integers matching the options array length
+ALTER TABLE public.campaign_questions
+  ADD COLUMN IF NOT EXISTS question_text_hausa TEXT,
+  ADD COLUMN IF NOT EXISTS options_hausa JSONB,
+  ADD COLUMN IF NOT EXISTS options_scores JSONB;

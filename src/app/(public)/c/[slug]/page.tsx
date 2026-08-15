@@ -6,7 +6,7 @@ import { MapPin, Wallet, LayoutGrid, HelpCircle } from 'lucide-react';
 import CampaignWizard from '@/components/CampaignWizard';
 import Image from 'next/image';
 import { api } from '@/lib/api';
-import { Campaign, CampaignQuestion, Project, CampaignMedia, CampaignFaq, Location } from '@/lib/types';
+import { Campaign, CampaignQuestion, Project, CampaignMedia, CampaignFaq, Location, CampaignPackage } from '@/lib/types';
 import { buildFallbackQuestions } from '@/lib/defaultCampaignQuestions';
 
 export default function CampaignLandingPage() {
@@ -18,6 +18,7 @@ export default function CampaignLandingPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [media, setMedia] = useState<CampaignMedia[]>([]);
   const [faqs, setFaqs] = useState<CampaignFaq[]>([]);
+  const [packages, setPackages] = useState<CampaignPackage[]>([]);
   const [locationName, setLocationName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,14 +41,16 @@ export default function CampaignLandingPage() {
 
             // Property presentation data — all driven by the campaign's own
             // configuration, never hard-coded per-campaign copy.
-            const [proj, mediaItems, faqItems] = await Promise.all([
+            const [proj, mediaItems, faqItems, pkgItems] = await Promise.all([
               camp.projectId ? api.getProjectById(camp.projectId) : Promise.resolve(null),
               api.getCampaignMedia(camp.id),
-              api.getCampaignFaqs(camp.id)
+              api.getCampaignFaqs(camp.id),
+              api.getCampaignPackages(camp.id)
             ]);
             setProject(proj);
             setMedia(mediaItems);
             setFaqs(faqItems);
+            setPackages(pkgItems);
 
             if (proj?.locationId) {
               const locations = await api.getLocations();
@@ -83,7 +86,7 @@ export default function CampaignLandingPage() {
   const heroImage = campaign.featuredImage || project?.coverImage;
   const propertyDetails = [
     locationName && { icon: MapPin, label: 'Location', value: locationName },
-    project && project.startingPrice > 0 && { icon: Wallet, label: 'Starting Price', value: `₦${project.startingPrice.toLocaleString()}` },
+    project && project.startingPrice > 0 && packages.length === 0 && { icon: Wallet, label: 'Starting Price', value: `₦${project.startingPrice.toLocaleString()}` },
     project && project.availableUnits > 0 && { icon: LayoutGrid, label: 'Available Units', value: String(project.availableUnits) },
   ].filter(Boolean) as { icon: typeof MapPin; label: string; value: string }[];
 
@@ -171,6 +174,40 @@ export default function CampaignLandingPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Packages */}
+              {packages.length > 0 && (
+                <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100">
+                  <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <Wallet className="w-6 h-6 text-[var(--color-primary)]" /> Packages & Pricing
+                  </h3>
+                  <div className="space-y-6">
+                    {packages.map(pkg => (
+                      <div key={pkg.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                        <h4 className="font-bold text-lg mb-2">{pkg.name}</h4>
+                        <div className="text-sm text-gray-600 grid grid-cols-2 gap-2">
+                          <div><strong>Outright:</strong> ₦{pkg.outrightPrice.toLocaleString()}</div>
+                          <div><strong>Deposit:</strong> ₦{pkg.initialDeposit.toLocaleString()}</div>
+                          {pkg.durationMonths > 0 && (
+                            <>
+                              <div><strong>Monthly:</strong> ₦{pkg.monthlyInstallment.toLocaleString()}</div>
+                              <div><strong>Duration:</strong> {pkg.durationMonths} Months</div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Terms and Conditions */}
+              {campaign.termsAndConditions && (
+                <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100 text-sm text-gray-600">
+                  <h3 className="text-lg font-bold mb-4 text-gray-800">Terms & Conditions</h3>
+                  <div className="whitespace-pre-wrap">{campaign.termsAndConditions}</div>
                 </div>
               )}
             </div>

@@ -146,7 +146,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
     if (!displayName || !contactData.phone) return;
     setLoading(true);
 
-    const scoreResult = calculateLeadScore(answers);
+    const scoreResult = calculateLeadScore(answers, questions, campaign);
     setFinalScore({ score: scoreResult.score, category: scoreResult.category });
 
     try {
@@ -305,13 +305,13 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
                   {t.questionLabel(currentStep + 1, visibleQuestions.length)}
                 </span>
                 <h3 className="text-2xl font-bold text-gray-800 leading-tight">
-                  {visibleQuestions[currentStep].questionText}
+                  {language === 'Hausa' && visibleQuestions[currentStep].questionTextHausa ? visibleQuestions[currentStep].questionTextHausa : visibleQuestions[currentStep].questionText}
                 </h3>
               </div>
 
               {(visibleQuestions[currentStep].type === 'Radio' || visibleQuestions[currentStep].type === 'Dropdown') ? (
                 <div className="grid gap-3 mb-8">
-                  {visibleQuestions[currentStep].options?.map(opt => (
+                  {(language === 'Hausa' && visibleQuestions[currentStep].optionsHausa ? visibleQuestions[currentStep].optionsHausa : visibleQuestions[currentStep].options)?.map(opt => (
                     <button
                       key={opt}
                       onClick={() => handleAnswer(visibleQuestions[currentStep].id, visibleQuestions[currentStep].questionText, opt)}

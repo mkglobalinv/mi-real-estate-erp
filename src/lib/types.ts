@@ -253,6 +253,16 @@ export interface Campaign {
   // WhatsApp handoff configuration
   whatsappMessageTemplate?: string;
 
+  // Qualification and scoring
+  hotThreshold?: number;
+  warmThreshold?: number;
+
+  // Terms and details
+  termsAndConditions?: string;
+  termsAndConditionsHausa?: string;
+  cancellationRules?: string;
+  cancellationRulesHausa?: string;
+
   // Analytics
   clicks?: number;
   leadsGenerated?: number;
@@ -279,6 +289,11 @@ export interface CampaignQuestion {
   // explicitly clear an existing condition when saving an edit.
   parentQuestionId?: string | null;
   showIfOption?: string | null;
+
+  // Multilingual and Scoring extensions
+  questionTextHausa?: string;
+  optionsHausa?: string[];
+  optionsScores?: number[];
 
   createdAt: string;
 }
@@ -314,6 +329,20 @@ export interface CampaignFaq {
   question: string;
   answer: string;
   orderIndex: number;
+  createdAt: string;
+}
+
+export interface CampaignPackage {
+  id: string;
+  campaignId: string;
+  name: string;
+  nameHausa?: string;
+  outrightPrice: number;
+  initialDeposit: number;
+  monthlyInstallment: number;
+  durationMonths: number;
+  description?: string;
+  descriptionHausa?: string;
   createdAt: string;
 }
 
