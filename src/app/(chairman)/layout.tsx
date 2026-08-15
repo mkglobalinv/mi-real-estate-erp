@@ -108,6 +108,15 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             </Link>
 
 
+            {/* MARKETING */}
+            <div className="pt-6 pb-1 px-4">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Marketing</p>
+            </div>
+            <Link href="/chairman/campaigns" onClick={closeMenu} className={linkClass('/chairman/campaigns')}>
+              <Megaphone className={iconClass('/chairman/campaigns')} />
+              Campaign Manager
+            </Link>
+
             {/* OVERSIGHT */}
             <div className="pt-6 pb-1 px-4">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Executive Oversight</p>
