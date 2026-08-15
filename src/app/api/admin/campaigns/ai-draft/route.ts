@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/utils/supabase/server';
 
-// AI Builder — Phase 10. This route only ever produces a DRAFT row in
+// AI Builder — Phase 11. This route only ever produces a DRAFT row in
 // campaign_ai_drafts. It never writes to campaigns/campaign_questions
 // directly; that only happens when an Admin explicitly approves the draft
-// (see /api/admin/campaigns/ai-draft/[id]/approve). It never touches
+// (see api.approveCampaignAiDraft in src/lib/api.ts). It never touches
 // applications/customers/payments/allocations at all.
 const SYSTEM_PROMPT = `You are a configuration assistant for M.I. Real Estate and General Enterprises Ltd's Landing Page Agent / Campaign Builder.
 

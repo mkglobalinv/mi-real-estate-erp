@@ -452,7 +452,7 @@ ALTER TABLE public.campaigns
 -- 26.6 AI Builder drafts.
 -- New, additive table. An AI draft is NEVER written into `campaigns`
 -- directly — it only becomes a live campaign once an Admin reviews and
--- approves it (application-layer rule enforced in Phase 10).
+-- approves it (application-layer rule enforced in Phase 11).
 CREATE TABLE IF NOT EXISTS public.campaign_ai_drafts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL,
