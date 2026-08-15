@@ -47,7 +47,7 @@ export default function EditCampaignPage({ basePath = '/admin', params: routePar
         <h1 className="text-3xl font-bold text-gray-900">Edit Campaign</h1>
         <p className="text-gray-500">Update your campaign settings.</p>
       </div>
-      <CampaignForm initialData={campaign} isEdit={true} />
+      <CampaignForm initialData={campaign} isEdit={true} basePath={basePath} />
     </div>
   );
 }

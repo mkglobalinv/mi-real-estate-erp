@@ -595,6 +595,89 @@ export const api = {
     if (error) throw error;
   },
 
+  // Campaign status management reuses the existing `status` column
+  // (Draft/Active/Paused/Archived/Ended) — covers Activate/Pause/Archive.
+  async updateCampaignStatus(id: string, status: Campaign['status']): Promise<Campaign> {
+    const { data, error } = await getSupabase().from('campaigns').update({ status }).eq('id', id).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToCampaign(data);
+  },
+
+  // Duplicates a campaign plus its questions (preserving branching links)
+  // and FAQs. The duplicate always starts as a Draft so it must be
+  // explicitly activated by an Admin.
+  async duplicateCampaign(id: string): Promise<Campaign> {
+    const original = await this.getCampaignById(id);
+    if (!original) throw new Error('Campaign not found');
+
+    const newSlug = `${original.slug}-copy-${Date.now().toString().slice(-5)}`;
+    const newCampaign = await this.saveCampaign({
+      name: `${original.name} (Copy)`,
+      slug: newSlug,
+      projectId: original.projectId,
+      description: original.description,
+      featuredImage: original.featuredImage,
+      fbAdReference: original.fbAdReference,
+      status: 'Draft',
+      whatsappNumber: original.whatsappNumber,
+      supportedLanguages: original.supportedLanguages,
+      defaultLanguage: original.defaultLanguage,
+      greetingEnabled: original.greetingEnabled,
+      greetingConfig: original.greetingConfig,
+      preApplicationEnabled: original.preApplicationEnabled,
+      applicationFormTemplateId: original.applicationFormTemplateId,
+      preApplicationPrompt: original.preApplicationPrompt,
+      whatsappMessageTemplate: original.whatsappMessageTemplate
+    });
+
+    const [questions, faqs] = await Promise.all([
+      this.getCampaignQuestions(id),
+      this.getCampaignFaqs(id)
+    ]);
+
+    // Pass 1: create the duplicated questions (without branching links yet,
+    // since the new parent ids don't exist until they're inserted).
+    const questionIdMap = new Map<string, string>();
+    for (const q of questions) {
+      const newQ = await this.saveCampaignQuestion({
+        campaignId: newCampaign.id,
+        type: q.type,
+        questionText: q.questionText,
+        options: q.options,
+        orderIndex: q.orderIndex,
+        isRequired: q.isRequired,
+        questionKey: q.questionKey
+      });
+      questionIdMap.set(q.id, newQ.id);
+    }
+
+    // Pass 2: re-wire conditional branching onto the new question ids.
+    for (const q of questions) {
+      if (q.parentQuestionId && questionIdMap.has(q.parentQuestionId)) {
+        const newChildId = questionIdMap.get(q.id);
+        const newParentId = questionIdMap.get(q.parentQuestionId);
+        if (newChildId && newParentId) {
+          await this.saveCampaignQuestion({
+            id: newChildId,
+            parentQuestionId: newParentId,
+            showIfOption: q.showIfOption
+          });
+        }
+      }
+    }
+
+    for (const f of faqs) {
+      await this.saveCampaignFaq({
+        campaignId: newCampaign.id,
+        question: f.question,
+        answer: f.answer,
+        orderIndex: f.orderIndex
+      });
+    }
+
+    return newCampaign;
+  },
+
   // --- CAMPAIGN QUESTIONS ---
   async getCampaignQuestions(campaignId: string): Promise<CampaignQuestion[]> {
     const { data, error } = await getSupabase().from('campaign_questions').select('*').eq('campaign_id', campaignId).order('order_index', { ascending: true });

@@ -9,9 +9,10 @@ import { toast } from 'react-hot-toast';
 interface CampaignFormProps {
   initialData?: Campaign;
   isEdit?: boolean;
+  basePath?: string;
 }
 
-export default function CampaignForm({ initialData, isEdit }: CampaignFormProps) {
+export default function CampaignForm({ initialData, isEdit, basePath = '/admin' }: CampaignFormProps) {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,7 +59,7 @@ export default function CampaignForm({ initialData, isEdit }: CampaignFormProps)
     try {
       await api.saveCampaign(formData);
       toast.success(`Campaign ${isEdit ? 'updated' : 'created'} successfully`);
-      router.push('/admin/campaigns');
+      router.push(`${basePath}/campaigns`);
     } catch (error) {
       console.error(error);
       toast.error('Failed to save campaign');
@@ -203,7 +204,7 @@ export default function CampaignForm({ initialData, isEdit }: CampaignFormProps)
       <div className="flex justify-end gap-4 mt-8 pt-4 border-t border-gray-100">
         <button
           type="button"
-          onClick={() => router.push('/admin/campaigns')}
+          onClick={() => router.push(`${basePath}/campaigns`)}
           className="px-6 py-2 border border-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-50"
         >
           Cancel
