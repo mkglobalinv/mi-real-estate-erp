@@ -185,9 +185,41 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
   };
 
   const generateWhatsAppLink = () => {
+    // Campaign-configured number always wins; the literal fallback only
+    // applies when no campaign number is set.
     const phone = campaign.whatsappNumber || '08069375042';
-    const answersSummary = answers.map(a => `${a.questionText}: ${a.answerText}`).join('\n');
-    const msg = `Hello! I am ${displayName}.\nI just completed the qualification for the ${campaign.name} campaign.\n\nMy Details:\n${answersSummary}\n\nPriority: ${finalScore.category} (${finalScore.score} pts)\nPhone: ${contactData.phone}\n\nI would like to proceed!`;
+
+    const findAnswer = (key: string) => {
+      const q = questions.find(qq => qq.questionKey === key);
+      return q ? answers.find(a => a.questionId === q.id)?.answerText : undefined;
+    };
+
+    const detailLines: string[] = [];
+    const location = findAnswer('location');
+    const plotSize = findAnswer('plot_size');
+    const purpose = findAnswer('purpose');
+    const paymentPreference = findAnswer('payment_preference');
+    const timeline = findAnswer('timeline');
+    const readiness = findAnswer('readiness');
+    if (location) detailLines.push(`- Location: ${location}`);
+    if (plotSize) detailLines.push(`- Plot Size: ${plotSize}`);
+    if (purpose) detailLines.push(`- Purpose: ${purpose}`);
+    if (paymentPreference) detailLines.push(`- Payment Preference: ${paymentPreference}`);
+    if (timeline) detailLines.push(`- Purchase Timeline: ${timeline}`);
+    if (readiness) detailLines.push(`- Purchase Readiness: ${readiness}`);
+    detailLines.push(`- Preferred Language: ${language}`);
+
+    // Any other answered questions (e.g. the installment follow-up, or
+    // Admin-added custom questions) that aren't already covered above.
+    const coveredKeys = new Set(['name', 'location', 'plot_size', 'purpose', 'payment_preference', 'timeline', 'readiness']);
+    answers.forEach(a => {
+      const q = questions.find(qq => qq.id === a.questionId);
+      if (!q?.questionKey || !coveredKeys.has(q.questionKey)) {
+        detailLines.push(`- ${a.questionText}: ${a.answerText}`);
+      }
+    });
+
+    const msg = `Hello! I am ${displayName}.\nI just completed the qualification for the ${campaign.name} campaign.\n\nMy Details:\n${detailLines.join('\n')}\n\nPriority: ${finalScore.category} (${finalScore.score} pts)\nPhone: ${contactData.phone}\n\nI would like to proceed!`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
