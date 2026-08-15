@@ -853,7 +853,7 @@ export const api = {
     const notesSummary = `[CAMPAIGN LEAD: ${campaign?.name || 'Unknown Campaign'}]\nCategory: ${scoreData.category} (${scoreData.score} pts)\nReadiness: ${scoreData.readiness ?? 'N/A'}\nTimeline: ${scoreData.timeline ?? 'N/A'}\n\nAnswers:\n${answersSummary}`;
 
     try {
-      const { error: crmError } = await getSupabase().from('leads').insert({
+      const { data: crmLeadData, error: crmError } = await getSupabase().from('leads').insert({
         ref: `MIRE-LD-${Date.now().toString().slice(-6)}`,
         name: leadData.name,
         phone: leadData.phone,
@@ -866,8 +866,21 @@ export const api = {
         score: scoreData.score,
         temperature: scoreData.category,
         status: 'New'
-      });
-      if (crmError) console.error('Supabase create CRM lead error:', crmError);
+      }).select().single();
+
+      if (crmError) {
+        console.error('Supabase create CRM lead error:', crmError);
+      } else if (crmLeadData?.id) {
+        // Link the campaign submission to the CRM lead it created, so the
+        // two records are actually related (not just connected by a notes
+        // string). Best-effort: the submission and CRM lead already exist
+        // either way, so a failure here doesn't need to fail the whole flow.
+        const { error: linkError } = await getSupabase()
+          .from('lead_submissions')
+          .update({ lead_id: crmLeadData.id })
+          .eq('id', leadId);
+        if (linkError) console.error('Failed to link lead_submission to CRM lead:', linkError);
+      }
     } catch (err) {
       console.error('Failed to create CRM lead:', err);
     }

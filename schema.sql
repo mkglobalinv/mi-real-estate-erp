@@ -464,3 +464,13 @@ CREATE TABLE IF NOT EXISTS public.campaign_ai_drafts (
     reviewed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ============================================================================
+-- PHASE 9 — lead_submissions -> leads relationship.
+-- Additive FK only. Existing lead_submissions rows are unaffected (lead_id
+-- defaults to NULL); api.submitCampaignLead() now sets it on new
+-- submissions instead of only linking the two by a notes-string summary.
+-- Does not touch the existing applications/customer workflow.
+-- ============================================================================
+ALTER TABLE public.lead_submissions
+  ADD COLUMN IF NOT EXISTS lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL;

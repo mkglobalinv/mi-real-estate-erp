@@ -490,6 +490,7 @@ export interface CampaignSubmission {
   source: string;
   status: string;
   assignedTo?: string;
+  leadId?: string; // FK to the CRM leads row created from this submission
   createdAt: string;
 }
 
