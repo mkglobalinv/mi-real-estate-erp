@@ -804,6 +804,108 @@ export const api = {
     return mapDbToCampaignAiDraft(data);
   },
 
+  // Calls the server-side AI Builder route (LLM call happens server-side
+  // only). Returns a Pending Review draft — never a live campaign.
+  async generateCampaignAiDraft(prompt: string): Promise<CampaignAiDraft> {
+    const response = await fetch('/api/admin/campaigns/ai-draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || `HTTP ${response.status}`);
+    }
+    return mapDbToCampaignAiDraft(await response.json());
+  },
+
+  async rejectCampaignAiDraft(draftId: string): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('campaign_ai_drafts').update({
+      status: 'Rejected',
+      reviewed_by: user?.id ?? null,
+      reviewed_at: new Date().toISOString()
+    }).eq('id', draftId);
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+  },
+
+  // Approve & Publish (Phase 10): turns a Pending Review draft into a real
+  // Draft-status campaign — never Active, so "publish" (activating it) is
+  // still a separate, explicit Admin action. This is the ONLY path from an
+  // AI draft into the live campaign tables.
+  async approveCampaignAiDraft(draftId: string): Promise<Campaign> {
+    const supabase = getSupabase();
+    const { data: draftRow, error: draftError } = await supabase.from('campaign_ai_drafts').select('*').eq('id', draftId).single();
+    if (draftError) throw new Error(`Failed to load draft: ${draftError.message}`);
+
+    const config = draftRow.generated_config as {
+      name: string;
+      suggestedSlug: string;
+      description?: string;
+      greetingEnabled?: boolean;
+      preApplicationEnabled?: boolean;
+      preApplicationPrompt?: string | null;
+      questions: Array<{
+        questionKey?: string | null;
+        type: CampaignQuestion['type'];
+        questionText: string;
+        options?: string[] | null;
+        isRequired: boolean;
+        parentQuestionKey?: string | null;
+        showIfOption?: string | null;
+      }>;
+    };
+
+    let slug = (config.suggestedSlug || config.name || 'campaign').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (await this.getCampaignBySlug(slug)) {
+      slug = `${slug}-${Date.now().toString().slice(-5)}`;
+    }
+
+    const newCampaign = await this.saveCampaign({
+      name: config.name,
+      slug,
+      description: config.description,
+      status: 'Draft',
+      greetingEnabled: config.greetingEnabled,
+      preApplicationEnabled: config.preApplicationEnabled,
+      preApplicationPrompt: config.preApplicationPrompt || undefined
+    });
+
+    const keyToId = new Map<string, string>();
+    for (const q of config.questions || []) {
+      const saved = await this.saveCampaignQuestion({
+        campaignId: newCampaign.id,
+        type: q.type,
+        questionText: q.questionText,
+        options: q.options || undefined,
+        isRequired: q.isRequired,
+        questionKey: q.questionKey || undefined
+      });
+      if (q.questionKey) keyToId.set(q.questionKey, saved.id);
+    }
+    for (const q of config.questions || []) {
+      if (q.questionKey && q.parentQuestionKey && keyToId.has(q.parentQuestionKey)) {
+        const childId = keyToId.get(q.questionKey);
+        const parentId = keyToId.get(q.parentQuestionKey);
+        if (childId && parentId) {
+          await this.saveCampaignQuestion({ id: childId, parentQuestionId: parentId, showIfOption: q.showIfOption || null });
+        }
+      }
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error: updateError } = await supabase.from('campaign_ai_drafts').update({
+      status: 'Approved',
+      campaign_id: newCampaign.id,
+      reviewed_by: user?.id ?? null,
+      reviewed_at: new Date().toISOString()
+    }).eq('id', draftId);
+    if (updateError) throw new Error(`Failed to update draft: ${updateError.message}`);
+
+    return newCampaign;
+  },
+
   // --- EVENT TRACKING & SUBMISSIONS ---
   async trackCampaignEvent(campaignId: string, eventType: string): Promise<void> {
     try {

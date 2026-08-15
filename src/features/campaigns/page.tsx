@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Campaign } from '@/lib/types';
 import Link from 'next/link';
-import { ExternalLink, Plus, Search, Edit, Trash2, Settings, ListPlus, MessageSquare, Copy, Play, Pause, Archive, BarChart3 } from 'lucide-react';
+import { ExternalLink, Plus, Search, Edit, Trash2, Settings, ListPlus, MessageSquare, Copy, Play, Pause, Archive, BarChart3, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AdminCampaignsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
@@ -75,10 +75,16 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
           <h1 className="text-3xl font-bold text-gray-900">Campaign Management</h1>
           <p className="text-gray-500">Manage your active marketing campaigns.</p>
         </div>
-        <Link href={`${basePath}/campaigns/create`} className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-opacity-90">
-          <Plus className="w-5 h-5" />
-          Create Campaign
-        </Link>
+        <div className="flex gap-3">
+          <Link href={`${basePath}/campaigns/ai-builder`} className="bg-white border border-[var(--color-primary)] text-[var(--color-primary)] px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[var(--color-primary-light)]">
+            <Sparkles className="w-5 h-5" />
+            AI Builder
+          </Link>
+          <Link href={`${basePath}/campaigns/create`} className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-opacity-90">
+            <Plus className="w-5 h-5" />
+            Create Campaign
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 flex gap-4 items-center">
