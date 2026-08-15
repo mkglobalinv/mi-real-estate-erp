@@ -92,6 +92,16 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
     }
   }, [phase, currentStep, campaign.id]);
 
+  // Conditional branching: a question with a parentQuestionId is only
+  // shown once the parent question has actually been answered with its
+  // showIfOption value. Recomputed each render from the current answers,
+  // so a question appears/disappears live as the triggering answer changes.
+  const visibleQuestions = questions.filter(q => {
+    if (!q.parentQuestionId) return true;
+    const parentAnswer = answers.find(a => a.questionId === q.parentQuestionId);
+    return parentAnswer?.answerText === q.showIfOption;
+  });
+
   // If a qualification question already asked for the customer's name
   // (questionKey 'name'), reuse that answer instead of asking again on the
   // contact step — computed at render time, not synced via an effect.
@@ -138,7 +148,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
       await api.trackCampaignEvent(campaign.id, 'wizard_complete');
       await api.trackCampaignEvent(campaign.id, 'lead_created');
       await api.trackCampaignEvent(campaign.id, 'lead_converted');
-      setCurrentStep(questions.length + 1); // Go to success
+      setCurrentStep(visibleQuestions.length + 1); // Go to success
     } catch (err) {
       console.error(err);
     } finally {
@@ -232,23 +242,23 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
           )}
 
           {/* Question Steps */}
-          {phase === 'wizard' && currentStep >= 0 && currentStep < questions.length && (
+          {phase === 'wizard' && currentStep >= 0 && currentStep < visibleQuestions.length && (
             <motion.div key={`q-${currentStep}`} variants={containerVariants} initial="hidden" animate="visible" exit="exit">
               <div className="mb-8">
                 <span className="text-[var(--color-primary)] font-bold text-sm uppercase tracking-widest mb-2 block">
-                  {t.questionLabel(currentStep + 1, questions.length)}
+                  {t.questionLabel(currentStep + 1, visibleQuestions.length)}
                 </span>
                 <h3 className="text-2xl font-bold text-gray-800 leading-tight">
-                  {questions[currentStep].questionText}
+                  {visibleQuestions[currentStep].questionText}
                 </h3>
               </div>
 
-              {(questions[currentStep].type === 'Radio' || questions[currentStep].type === 'Dropdown') ? (
+              {(visibleQuestions[currentStep].type === 'Radio' || visibleQuestions[currentStep].type === 'Dropdown') ? (
                 <div className="grid gap-3 mb-8">
-                  {questions[currentStep].options?.map(opt => (
+                  {visibleQuestions[currentStep].options?.map(opt => (
                     <button
                       key={opt}
-                      onClick={() => handleAnswer(questions[currentStep].id, questions[currentStep].questionText, opt)}
+                      onClick={() => handleAnswer(visibleQuestions[currentStep].id, visibleQuestions[currentStep].questionText, opt)}
                       className="p-4 rounded-xl border border-gray-200 text-left transition-colors text-gray-700 hover:border-green-300 hover:bg-green-50 text-lg group flex items-center justify-between"
                     >
                       {opt}
@@ -258,9 +268,9 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
                 </div>
               ) : (
                 <QuestionTextInput
-                  question={questions[currentStep]}
-                  initialValue={answers.find(a => a.questionId === questions[currentStep].id)?.answerText || ''}
-                  onSubmit={text => handleAnswer(questions[currentStep].id, questions[currentStep].questionText, text)}
+                  question={visibleQuestions[currentStep]}
+                  initialValue={answers.find(a => a.questionId === visibleQuestions[currentStep].id)?.answerText || ''}
+                  onSubmit={text => handleAnswer(visibleQuestions[currentStep].id, visibleQuestions[currentStep].questionText, text)}
                   continueLabel={t.continueButton}
                 />
               )}
@@ -277,7 +287,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
           )}
 
           {/* Contact Step */}
-          {phase === 'wizard' && currentStep === questions.length && (
+          {phase === 'wizard' && currentStep === visibleQuestions.length && (
             <motion.div key="contact" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
               <div className="flex items-center gap-3 mb-6">
                 <User className="text-[var(--color-primary)] w-6 h-6" />
@@ -310,7 +320,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
           )}
 
           {/* Success Step (WhatsApp Handoff) */}
-          {phase === 'wizard' && currentStep === questions.length + 1 && (
+          {phase === 'wizard' && currentStep === visibleQuestions.length + 1 && (
             <motion.div key="success" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center py-8">
               <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-12 h-12 text-green-600" />
@@ -341,9 +351,9 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
       </div>
 
       {/* Progress Indicator */}
-      {phase === 'wizard' && currentStep >= 0 && currentStep <= questions.length && (
+      {phase === 'wizard' && currentStep >= 0 && currentStep <= visibleQuestions.length && (
         <div className="bg-gray-50 p-4 border-t border-gray-100 flex justify-center gap-2">
-          {Array.from({ length: questions.length + 1 }).map((_, idx) => (
+          {Array.from({ length: visibleQuestions.length + 1 }).map((_, idx) => (
             <div key={idx} className={`h-2 w-full max-w-[40px] rounded-full ${idx <= currentStep ? 'bg-[var(--color-primary)]' : 'bg-gray-200 transition-colors duration-300'}`} />
           ))}
         </div>

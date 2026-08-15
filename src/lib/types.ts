@@ -275,9 +275,10 @@ export interface CampaignQuestion {
   questionKey?: string;
 
   // Conditional branching: this question is only shown if the answer to
-  // parentQuestionId equals showIfOption.
-  parentQuestionId?: string;
-  showIfOption?: string;
+  // parentQuestionId equals showIfOption. Set to null (not undefined) to
+  // explicitly clear an existing condition when saving an edit.
+  parentQuestionId?: string | null;
+  showIfOption?: string | null;
 
   createdAt: string;
 }

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Campaign, CampaignQuestion } from '@/lib/types';
 import { toast } from 'react-hot-toast';
-import { Plus, Edit, Trash2, ArrowLeft, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, ArrowLeft, GripVertical, GitBranch } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CampaignQuestionsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
@@ -187,6 +187,50 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
                 />
               </div>
 
+              <div className="border-t border-gray-100 pt-4">
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1">
+                  <GitBranch className="w-4 h-4" /> Conditional Display (optional)
+                </label>
+                <p className="text-xs text-gray-500 mb-2">Only show this question if another question was answered a specific way.</p>
+                <select
+                  value={currentQuestion.parentQuestionId || ''}
+                  onChange={(e) => setCurrentQuestion({...currentQuestion, parentQuestionId: e.target.value || null, showIfOption: null})}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none mb-2"
+                >
+                  <option value="">Always show</option>
+                  {questions.filter(q => q.id !== currentQuestion.id).map(q => (
+                    <option key={q.id} value={q.id}>{q.questionText}</option>
+                  ))}
+                </select>
+
+                {currentQuestion.parentQuestionId && (() => {
+                  const parentQuestion = questions.find(q => q.id === currentQuestion.parentQuestionId);
+                  const parentOptions = parentQuestion?.options || [];
+                  return parentOptions.length > 0 ? (
+                    <select
+                      required
+                      value={currentQuestion.showIfOption || ''}
+                      onChange={(e) => setCurrentQuestion({...currentQuestion, showIfOption: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none"
+                    >
+                      <option value="">Show when answer is...</option>
+                      {parentOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      required
+                      value={currentQuestion.showIfOption || ''}
+                      onChange={(e) => setCurrentQuestion({...currentQuestion, showIfOption: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none"
+                      placeholder="Exact answer text that triggers this question"
+                    />
+                  );
+                })()}
+              </div>
+
               <div className="pt-4 flex gap-2">
                 {isEditing && (
                   <button
@@ -238,6 +282,12 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
                       <p className="font-semibold text-gray-900">{q.questionText}</p>
                       {q.options && q.options.length > 0 && (
                         <p className="text-sm text-gray-500 mt-1">Options: {q.options.join(', ')}</p>
+                      )}
+                      {q.parentQuestionId && (
+                        <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                          <GitBranch className="w-3 h-3" />
+                          Shown only if &ldquo;{questions.find(p => p.id === q.parentQuestionId)?.questionText || 'deleted question'}&rdquo; = &ldquo;{q.showIfOption}&rdquo;
+                        </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2">

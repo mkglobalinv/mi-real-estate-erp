@@ -3,7 +3,7 @@ import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadT
 import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
-import { DEFAULT_QUALIFICATION_QUESTIONS } from './defaultCampaignQuestions';
+import { DEFAULT_QUALIFICATION_QUESTIONS, DEFAULT_CONDITIONAL_QUESTION } from './defaultCampaignQuestions';
 
 // We use the browser client for the UI data layer
 const getSupabase = () => createClient();
@@ -707,13 +707,26 @@ export const api = {
   // Seeds a brand-new campaign with the approved default qualification
   // questions so it has a working, Admin-editable flow immediately
   // (rather than the public page silently using an in-memory fallback
-  // Admin can never see or edit).
+  // Admin can never see or edit). Includes one working conditional
+  // branching example (installment follow-up), wired to the real id of
+  // the readiness question once it exists.
   async seedDefaultCampaignQuestions(campaignId: string): Promise<CampaignQuestion[]> {
     const created: CampaignQuestion[] = [];
+    const keyToId = new Map<string, string>();
     for (const q of DEFAULT_QUALIFICATION_QUESTIONS) {
       const saved = await this.saveCampaignQuestion({ ...q, campaignId });
       created.push(saved);
+      if (q.questionKey) keyToId.set(q.questionKey, saved.id);
     }
+
+    const parentId = keyToId.get(DEFAULT_CONDITIONAL_QUESTION.triggerQuestionKey);
+    if (parentId) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { triggerQuestionKey, ...conditional } = DEFAULT_CONDITIONAL_QUESTION;
+      const savedConditional = await this.saveCampaignQuestion({ ...conditional, campaignId, parentQuestionId: parentId });
+      created.push(savedConditional);
+    }
+
     return created;
   },
 
