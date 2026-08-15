@@ -1,8 +1,9 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb } from './supabase-mappers';
-import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location } from './types';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb } from './supabase-mappers';
+import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
+import { DEFAULT_QUALIFICATION_QUESTIONS, DEFAULT_CONDITIONAL_QUESTION } from './defaultCampaignQuestions';
 
 // We use the browser client for the UI data layer
 const getSupabase = () => createClient();
@@ -45,6 +46,12 @@ export const api = {
   async saveProject(proj: Partial<Project>): Promise<Project> {
     const { data, error } = await getSupabase().from('projects').upsert(proj).select().single();
     if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToProject(data);
+  },
+
+  async getProjectById(id: string): Promise<Project | null> {
+    const { data, error } = await getSupabase().from('projects').select('*').eq('id', id).maybeSingle();
+    if (error || !data) return null;
     return mapDbToProject(data);
   },
 
@@ -595,6 +602,89 @@ export const api = {
     if (error) throw error;
   },
 
+  // Campaign status management reuses the existing `status` column
+  // (Draft/Active/Paused/Archived/Ended) — covers Activate/Pause/Archive.
+  async updateCampaignStatus(id: string, status: Campaign['status']): Promise<Campaign> {
+    const { data, error } = await getSupabase().from('campaigns').update({ status }).eq('id', id).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToCampaign(data);
+  },
+
+  // Duplicates a campaign plus its questions (preserving branching links)
+  // and FAQs. The duplicate always starts as a Draft so it must be
+  // explicitly activated by an Admin.
+  async duplicateCampaign(id: string): Promise<Campaign> {
+    const original = await this.getCampaignById(id);
+    if (!original) throw new Error('Campaign not found');
+
+    const newSlug = `${original.slug}-copy-${Date.now().toString().slice(-5)}`;
+    const newCampaign = await this.saveCampaign({
+      name: `${original.name} (Copy)`,
+      slug: newSlug,
+      projectId: original.projectId,
+      description: original.description,
+      featuredImage: original.featuredImage,
+      fbAdReference: original.fbAdReference,
+      status: 'Draft',
+      whatsappNumber: original.whatsappNumber,
+      supportedLanguages: original.supportedLanguages,
+      defaultLanguage: original.defaultLanguage,
+      greetingEnabled: original.greetingEnabled,
+      greetingConfig: original.greetingConfig,
+      preApplicationEnabled: original.preApplicationEnabled,
+      applicationFormTemplateId: original.applicationFormTemplateId,
+      preApplicationPrompt: original.preApplicationPrompt,
+      whatsappMessageTemplate: original.whatsappMessageTemplate
+    });
+
+    const [questions, faqs] = await Promise.all([
+      this.getCampaignQuestions(id),
+      this.getCampaignFaqs(id)
+    ]);
+
+    // Pass 1: create the duplicated questions (without branching links yet,
+    // since the new parent ids don't exist until they're inserted).
+    const questionIdMap = new Map<string, string>();
+    for (const q of questions) {
+      const newQ = await this.saveCampaignQuestion({
+        campaignId: newCampaign.id,
+        type: q.type,
+        questionText: q.questionText,
+        options: q.options,
+        orderIndex: q.orderIndex,
+        isRequired: q.isRequired,
+        questionKey: q.questionKey
+      });
+      questionIdMap.set(q.id, newQ.id);
+    }
+
+    // Pass 2: re-wire conditional branching onto the new question ids.
+    for (const q of questions) {
+      if (q.parentQuestionId && questionIdMap.has(q.parentQuestionId)) {
+        const newChildId = questionIdMap.get(q.id);
+        const newParentId = questionIdMap.get(q.parentQuestionId);
+        if (newChildId && newParentId) {
+          await this.saveCampaignQuestion({
+            id: newChildId,
+            parentQuestionId: newParentId,
+            showIfOption: q.showIfOption
+          });
+        }
+      }
+    }
+
+    for (const f of faqs) {
+      await this.saveCampaignFaq({
+        campaignId: newCampaign.id,
+        question: f.question,
+        answer: f.answer,
+        orderIndex: f.orderIndex
+      });
+    }
+
+    return newCampaign;
+  },
+
   // --- CAMPAIGN QUESTIONS ---
   async getCampaignQuestions(campaignId: string): Promise<CampaignQuestion[]> {
     const { data, error } = await getSupabase().from('campaign_questions').select('*').eq('campaign_id', campaignId).order('order_index', { ascending: true });
@@ -614,6 +704,32 @@ export const api = {
     if (error) throw error;
   },
 
+  // Seeds a brand-new campaign with the approved default qualification
+  // questions so it has a working, Admin-editable flow immediately
+  // (rather than the public page silently using an in-memory fallback
+  // Admin can never see or edit). Includes one working conditional
+  // branching example (installment follow-up), wired to the real id of
+  // the readiness question once it exists.
+  async seedDefaultCampaignQuestions(campaignId: string): Promise<CampaignQuestion[]> {
+    const created: CampaignQuestion[] = [];
+    const keyToId = new Map<string, string>();
+    for (const q of DEFAULT_QUALIFICATION_QUESTIONS) {
+      const saved = await this.saveCampaignQuestion({ ...q, campaignId });
+      created.push(saved);
+      if (q.questionKey) keyToId.set(q.questionKey, saved.id);
+    }
+
+    const parentId = keyToId.get(DEFAULT_CONDITIONAL_QUESTION.triggerQuestionKey);
+    if (parentId) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { triggerQuestionKey, ...conditional } = DEFAULT_CONDITIONAL_QUESTION;
+      const savedConditional = await this.saveCampaignQuestion({ ...conditional, campaignId, parentQuestionId: parentId });
+      created.push(savedConditional);
+    }
+
+    return created;
+  },
+
   // --- CAMPAIGN FAQS ---
   async getCampaignFaqs(campaignId: string): Promise<CampaignFaq[]> {
     const { data, error } = await getSupabase().from('campaign_faqs').select('*').eq('campaign_id', campaignId).order('order_index', { ascending: true });
@@ -631,6 +747,163 @@ export const api = {
   async deleteCampaignFaq(id: string): Promise<void> {
     const { error } = await getSupabase().from('campaign_faqs').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  // --- CAMPAIGN MEDIA (property presentation gallery) ---
+  async getCampaignMedia(campaignId: string): Promise<CampaignMedia[]> {
+    const { data, error } = await getSupabase().from('campaign_media').select('*').eq('campaign_id', campaignId).order('created_at', { ascending: true });
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data ? data.map(mapDbToCampaignMedia) : [];
+  },
+
+  async saveCampaignMedia(media: Partial<CampaignMedia>): Promise<CampaignMedia> {
+    const mapped = mapCampaignMediaToDb(media);
+    const { data, error } = await getSupabase().from('campaign_media').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToCampaignMedia(data);
+  },
+
+  async deleteCampaignMedia(id: string): Promise<void> {
+    const { error } = await getSupabase().from('campaign_media').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- APPLICATION FORM TEMPLATES (Landing Page Agent: pre-application form config) ---
+  async getApplicationFormTemplates(): Promise<ApplicationFormTemplate[]> {
+    const { data, error } = await getSupabase().from('application_form_templates').select('*').order('created_at', { ascending: false });
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data ? data.map(mapDbToApplicationFormTemplate) : [];
+  },
+
+  async saveApplicationFormTemplate(template: Partial<ApplicationFormTemplate>): Promise<ApplicationFormTemplate> {
+    const mapped = mapApplicationFormTemplateToDb(template);
+    const { data, error } = await getSupabase().from('application_form_templates').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToApplicationFormTemplate(data);
+  },
+
+  async getApplicationFormTemplateById(id: string): Promise<ApplicationFormTemplate | null> {
+    const { data, error } = await getSupabase().from('application_form_templates').select('*').eq('id', id).maybeSingle();
+    if (error || !data) return null;
+    return mapDbToApplicationFormTemplate(data);
+  },
+
+  // --- CAMPAIGN AI DRAFTS (Landing Page Agent: AI Builder draft -> review -> approve) ---
+  async getCampaignAiDrafts(campaignId?: string): Promise<CampaignAiDraft[]> {
+    let query = getSupabase().from('campaign_ai_drafts').select('*').order('created_at', { ascending: false });
+    if (campaignId) query = query.eq('campaign_id', campaignId);
+    const { data, error } = await query;
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data ? data.map(mapDbToCampaignAiDraft) : [];
+  },
+
+  async saveCampaignAiDraft(draft: Partial<CampaignAiDraft>): Promise<CampaignAiDraft> {
+    const mapped = mapCampaignAiDraftToDb(draft);
+    const { data, error } = await getSupabase().from('campaign_ai_drafts').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToCampaignAiDraft(data);
+  },
+
+  // Calls the server-side AI Builder route (LLM call happens server-side
+  // only). Returns a Pending Review draft — never a live campaign.
+  async generateCampaignAiDraft(prompt: string): Promise<CampaignAiDraft> {
+    const response = await fetch('/api/admin/campaigns/ai-draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || `HTTP ${response.status}`);
+    }
+    return mapDbToCampaignAiDraft(await response.json());
+  },
+
+  async rejectCampaignAiDraft(draftId: string): Promise<void> {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('campaign_ai_drafts').update({
+      status: 'Rejected',
+      reviewed_by: user?.id ?? null,
+      reviewed_at: new Date().toISOString()
+    }).eq('id', draftId);
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+  },
+
+  // Approve & Publish (Phase 10): turns a Pending Review draft into a real
+  // Draft-status campaign — never Active, so "publish" (activating it) is
+  // still a separate, explicit Admin action. This is the ONLY path from an
+  // AI draft into the live campaign tables.
+  async approveCampaignAiDraft(draftId: string): Promise<Campaign> {
+    const supabase = getSupabase();
+    const { data: draftRow, error: draftError } = await supabase.from('campaign_ai_drafts').select('*').eq('id', draftId).single();
+    if (draftError) throw new Error(`Failed to load draft: ${draftError.message}`);
+
+    const config = draftRow.generated_config as {
+      name: string;
+      suggestedSlug: string;
+      description?: string;
+      greetingEnabled?: boolean;
+      preApplicationEnabled?: boolean;
+      preApplicationPrompt?: string | null;
+      questions: Array<{
+        questionKey?: string | null;
+        type: CampaignQuestion['type'];
+        questionText: string;
+        options?: string[] | null;
+        isRequired: boolean;
+        parentQuestionKey?: string | null;
+        showIfOption?: string | null;
+      }>;
+    };
+
+    let slug = (config.suggestedSlug || config.name || 'campaign').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (await this.getCampaignBySlug(slug)) {
+      slug = `${slug}-${Date.now().toString().slice(-5)}`;
+    }
+
+    const newCampaign = await this.saveCampaign({
+      name: config.name,
+      slug,
+      description: config.description,
+      status: 'Draft',
+      greetingEnabled: config.greetingEnabled,
+      preApplicationEnabled: config.preApplicationEnabled,
+      preApplicationPrompt: config.preApplicationPrompt || undefined
+    });
+
+    const keyToId = new Map<string, string>();
+    for (const q of config.questions || []) {
+      const saved = await this.saveCampaignQuestion({
+        campaignId: newCampaign.id,
+        type: q.type,
+        questionText: q.questionText,
+        options: q.options || undefined,
+        isRequired: q.isRequired,
+        questionKey: q.questionKey || undefined
+      });
+      if (q.questionKey) keyToId.set(q.questionKey, saved.id);
+    }
+    for (const q of config.questions || []) {
+      if (q.questionKey && q.parentQuestionKey && keyToId.has(q.parentQuestionKey)) {
+        const childId = keyToId.get(q.questionKey);
+        const parentId = keyToId.get(q.parentQuestionKey);
+        if (childId && parentId) {
+          await this.saveCampaignQuestion({ id: childId, parentQuestionId: parentId, showIfOption: q.showIfOption || null });
+        }
+      }
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error: updateError } = await supabase.from('campaign_ai_drafts').update({
+      status: 'Approved',
+      campaign_id: newCampaign.id,
+      reviewed_by: user?.id ?? null,
+      reviewed_at: new Date().toISOString()
+    }).eq('id', draftId);
+    if (updateError) throw new Error(`Failed to update draft: ${updateError.message}`);
+
+    return newCampaign;
   },
 
   // --- EVENT TRACKING & SUBMISSIONS ---
@@ -682,7 +955,7 @@ export const api = {
     const notesSummary = `[CAMPAIGN LEAD: ${campaign?.name || 'Unknown Campaign'}]\nCategory: ${scoreData.category} (${scoreData.score} pts)\nReadiness: ${scoreData.readiness ?? 'N/A'}\nTimeline: ${scoreData.timeline ?? 'N/A'}\n\nAnswers:\n${answersSummary}`;
 
     try {
-      const { error: crmError } = await getSupabase().from('leads').insert({
+      const { data: crmLeadData, error: crmError } = await getSupabase().from('leads').insert({
         ref: `MIRE-LD-${Date.now().toString().slice(-6)}`,
         name: leadData.name,
         phone: leadData.phone,
@@ -695,8 +968,21 @@ export const api = {
         score: scoreData.score,
         temperature: scoreData.category,
         status: 'New'
-      });
-      if (crmError) console.error('Supabase create CRM lead error:', crmError);
+      }).select().single();
+
+      if (crmError) {
+        console.error('Supabase create CRM lead error:', crmError);
+      } else if (crmLeadData?.id) {
+        // Link the campaign submission to the CRM lead it created, so the
+        // two records are actually related (not just connected by a notes
+        // string). Best-effort: the submission and CRM lead already exist
+        // either way, so a failure here doesn't need to fail the whole flow.
+        const { error: linkError } = await getSupabase()
+          .from('lead_submissions')
+          .update({ lead_id: crmLeadData.id })
+          .eq('id', leadId);
+        if (linkError) console.error('Failed to link lead_submission to CRM lead:', linkError);
+      }
     } catch (err) {
       console.error('Failed to create CRM lead:', err);
     }
@@ -710,6 +996,18 @@ export const api = {
     const { data, error } = await query;
     if (!error && data) return data;
     return [];
+  },
+
+  // Submissions for a campaign, with their lead score attached — used by
+  // the campaign analytics/leads view.
+  async getCampaignSubmissions(campaignId: string): Promise<unknown[]> {
+    const { data, error } = await getSupabase()
+      .from('lead_submissions')
+      .select('*, lead_scores(score, category)')
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data || [];
   },
 
   async getTickets(): Promise<CustomerCareTicket[]> {

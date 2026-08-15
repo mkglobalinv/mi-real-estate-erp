@@ -8,7 +8,7 @@ export default function CreateCampaignPage({ basePath = '/admin', params: routeP
         <h1 className="text-3xl font-bold text-gray-900">Create Campaign</h1>
         <p className="text-gray-500">Set up a new marketing campaign and landing page.</p>
       </div>
-      <CampaignForm />
+      <CampaignForm basePath={basePath} />
     </div>
   );
 }

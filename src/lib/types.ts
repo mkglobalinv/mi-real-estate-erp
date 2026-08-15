@@ -86,6 +86,7 @@ export interface Project extends BaseRolePrep {
   name: string;
   description: string;
   location?: string;
+  locationId?: string;
   coverImage?: string;
   availableUnits: number;
   startingPrice: number;
@@ -214,6 +215,14 @@ export interface PropertySubmission {
   createdAt: string;
 }
 
+export interface CampaignGreetingConfig {
+  [language: string]: {
+    morning?: string;
+    afternoon?: string;
+    evening?: string;
+  };
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -227,11 +236,27 @@ export interface Campaign {
   startDate?: string;
   endDate?: string;
   whatsappNumber?: string;
-  
+
+  // Language configuration
+  supportedLanguages?: string[];
+  defaultLanguage?: string;
+
+  // Formal greeting configuration
+  greetingEnabled?: boolean;
+  greetingConfig?: CampaignGreetingConfig;
+
+  // Optional pre-application form configuration
+  preApplicationEnabled?: boolean;
+  applicationFormTemplateId?: string;
+  preApplicationPrompt?: string;
+
+  // WhatsApp handoff configuration
+  whatsappMessageTemplate?: string;
+
   // Analytics
   clicks?: number;
   leadsGenerated?: number;
-  
+
   createdAt: string;
 }
 
@@ -243,6 +268,43 @@ export interface CampaignQuestion {
   options?: string[]; // for radio/dropdown
   orderIndex: number;
   isRequired: boolean;
+
+  // Stable machine key for well-known qualification questions
+  // (e.g. 'name', 'location', 'plot_size', 'purpose',
+  // 'payment_preference', 'timeline', 'readiness'). Optional.
+  questionKey?: string;
+
+  // Conditional branching: this question is only shown if the answer to
+  // parentQuestionId equals showIfOption. Set to null (not undefined) to
+  // explicitly clear an existing condition when saving an edit.
+  parentQuestionId?: string | null;
+  showIfOption?: string | null;
+
+  createdAt: string;
+}
+
+export interface ApplicationFormTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  // The actual official form document/link (hosted PDF or external form
+  // URL) — the real integration point, mirroring documents.file_url.
+  fileUrl?: string;
+  fields: Array<{ key: string; label: string; type: string; required?: boolean }>;
+  status: 'Active' | 'Inactive';
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface CampaignAiDraft {
+  id: string;
+  campaignId?: string;
+  promptText: string;
+  generatedConfig: Record<string, unknown>;
+  status: 'Pending Review' | 'Approved' | 'Rejected';
+  createdBy?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   createdAt: string;
 }
 
@@ -428,6 +490,7 @@ export interface CampaignSubmission {
   source: string;
   status: string;
   assignedTo?: string;
+  leadId?: string; // FK to the CRM leads row created from this submission
   createdAt: string;
 }
 

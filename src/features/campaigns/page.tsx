@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Campaign } from '@/lib/types';
 import Link from 'next/link';
-import { ExternalLink, Plus, Search, Edit, Trash2, Settings, ListPlus, MessageSquare } from 'lucide-react';
+import { ExternalLink, Plus, Search, Edit, Trash2, Settings, ListPlus, MessageSquare, Copy, Play, Pause, Archive, BarChart3, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AdminCampaignsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
@@ -41,6 +41,28 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
     }
   };
 
+  const handleDuplicate = async (id: string) => {
+    try {
+      await api.duplicateCampaign(id);
+      toast.success('Campaign duplicated as a new Draft');
+      loadCampaigns();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to duplicate campaign');
+    }
+  };
+
+  const handleStatusChange = async (id: string, status: Campaign['status']) => {
+    try {
+      await api.updateCampaignStatus(id, status);
+      toast.success(`Campaign ${status.toLowerCase()}`);
+      loadCampaigns();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update campaign status');
+    }
+  };
+
   const filteredCampaigns = campaigns.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.slug.toLowerCase().includes(searchTerm.toLowerCase())
@@ -53,10 +75,16 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
           <h1 className="text-3xl font-bold text-gray-900">Campaign Management</h1>
           <p className="text-gray-500">Manage your active marketing campaigns.</p>
         </div>
-        <Link href={`${basePath}/campaigns/create`} className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-opacity-90">
-          <Plus className="w-5 h-5" />
-          Create Campaign
-        </Link>
+        <div className="flex gap-3">
+          <Link href={`${basePath}/campaigns/ai-builder`} className="bg-white border border-[var(--color-primary)] text-[var(--color-primary)] px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-[var(--color-primary-light)]">
+            <Sparkles className="w-5 h-5" />
+            AI Builder
+          </Link>
+          <Link href={`${basePath}/campaigns/create`} className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-opacity-90">
+            <Plus className="w-5 h-5" />
+            Create Campaign
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8 flex gap-4 items-center">
@@ -123,12 +151,15 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
                     <p className="text-xs text-[var(--color-primary)] font-bold">{camp.leadsGenerated || 0} Leads</p>
                   </td>
                   <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link href={`/campaign/${camp.slug}`} target="_blank" title="Preview" className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                      <Link href={`/c/${camp.slug}`} target="_blank" title="Preview" className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
                         <ExternalLink className="w-4 h-4" />
                       </Link>
                       <Link href={`${basePath}/campaigns/${camp.id}/faqs`} title="Manage FAQs" className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg">
                         <MessageSquare className="w-4 h-4" />
+                      </Link>
+                      <Link href={`${basePath}/campaigns/${camp.id}/analytics`} title="View Analytics & Leads" className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">
+                        <BarChart3 className="w-4 h-4" />
                       </Link>
                       <Link href={`${basePath}/campaigns/${camp.id}/questions`} title="Manage Questions" className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg">
                         <ListPlus className="w-4 h-4" />
@@ -136,6 +167,24 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
                       <Link href={`${basePath}/campaigns/${camp.id}/edit`} title="Edit Campaign" className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg">
                         <Edit className="w-4 h-4" />
                       </Link>
+                      <button onClick={() => handleDuplicate(camp.id)} title="Duplicate" className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">
+                        <Copy className="w-4 h-4" />
+                      </button>
+                      {camp.status !== 'Active' && (
+                        <button onClick={() => handleStatusChange(camp.id, 'Active')} title="Activate" className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg">
+                          <Play className="w-4 h-4" />
+                        </button>
+                      )}
+                      {camp.status === 'Active' && (
+                        <button onClick={() => handleStatusChange(camp.id, 'Paused')} title="Pause" className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg">
+                          <Pause className="w-4 h-4" />
+                        </button>
+                      )}
+                      {camp.status !== 'Archived' && (
+                        <button onClick={() => handleStatusChange(camp.id, 'Archived')} title="Archive" className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg">
+                          <Archive className="w-4 h-4" />
+                        </button>
+                      )}
                       <button onClick={() => handleDelete(camp.id)} title="Delete" className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg">
                         <Trash2 className="w-4 h-4" />
                       </button>

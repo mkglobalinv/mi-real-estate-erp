@@ -1,4 +1,4 @@
-import { PropertyListing, Project, Customer, Lead, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Allocation, Document, CustomerCareTicket, Receipt, InspectionBooking, Reservation } from './types';
+import { PropertyListing, Project, Customer, Lead, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Allocation, Document, CustomerCareTicket, Receipt, InspectionBooking, Reservation, ApplicationFormTemplate, CampaignAiDraft, CampaignMedia } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 
 export function mapDbToProperty(dbProp: any): PropertyListing {
@@ -53,6 +53,7 @@ export function mapDbToProject(db: any): Project {
     startingPrice: Number(db.starting_price),
     availableUnits: Number(db.available_units),
     coverImage: db.cover_image,
+    locationId: db.location_id,
     easyBuyStatus: db.easy_buy_status,
     createdAt: db.created_at
   };
@@ -400,6 +401,14 @@ export function mapDbToCampaign(db: any): any {
     startDate: db.start_date,
     endDate: db.end_date,
     whatsappNumber: db.whatsapp_number,
+    supportedLanguages: db.supported_languages,
+    defaultLanguage: db.default_language,
+    greetingEnabled: db.greeting_enabled,
+    greetingConfig: db.greeting_config,
+    preApplicationEnabled: db.pre_application_enabled,
+    applicationFormTemplateId: db.application_form_template_id,
+    preApplicationPrompt: db.pre_application_prompt,
+    whatsappMessageTemplate: db.whatsapp_message_template,
     createdAt: db.created_at,
     clicks: db.campaign_analytics?.[0]?.count ?? 0,
     leadsGenerated: db.lead_submissions?.[0]?.count ?? 0
@@ -418,7 +427,15 @@ export function mapCampaignToDb(camp: any): any {
     ...(camp.status && { status: camp.status }),
     ...(camp.startDate && { start_date: camp.startDate }),
     ...(camp.endDate && { end_date: camp.endDate }),
-    ...(camp.whatsappNumber && { whatsapp_number: camp.whatsappNumber })
+    ...(camp.whatsappNumber && { whatsapp_number: camp.whatsappNumber }),
+    ...(camp.supportedLanguages && { supported_languages: camp.supportedLanguages }),
+    ...(camp.defaultLanguage && { default_language: camp.defaultLanguage }),
+    ...(camp.greetingEnabled !== undefined && { greeting_enabled: camp.greetingEnabled }),
+    ...(camp.greetingConfig && { greeting_config: camp.greetingConfig }),
+    ...(camp.preApplicationEnabled !== undefined && { pre_application_enabled: camp.preApplicationEnabled }),
+    ...(camp.applicationFormTemplateId !== undefined && { application_form_template_id: camp.applicationFormTemplateId || null }),
+    ...(camp.preApplicationPrompt !== undefined && { pre_application_prompt: camp.preApplicationPrompt }),
+    ...(camp.whatsappMessageTemplate !== undefined && { whatsapp_message_template: camp.whatsappMessageTemplate })
   };
 }
 
@@ -431,6 +448,9 @@ export function mapDbToCampaignQuestion(db: any): any {
     options: db.options,
     orderIndex: db.order_index,
     isRequired: db.is_required,
+    questionKey: db.question_key,
+    parentQuestionId: db.parent_question_id,
+    showIfOption: db.show_if_option,
     createdAt: db.created_at
   };
 }
@@ -443,7 +463,62 @@ export function mapCampaignQuestionToDb(q: any): any {
     ...(q.questionText && { question_text: q.questionText }),
     ...(q.options && { options: q.options }),
     ...(q.orderIndex !== undefined && { order_index: q.orderIndex }),
-    ...(q.isRequired !== undefined && { is_required: q.isRequired })
+    ...(q.isRequired !== undefined && { is_required: q.isRequired }),
+    ...(q.questionKey !== undefined && { question_key: q.questionKey }),
+    ...(q.parentQuestionId !== undefined && { parent_question_id: q.parentQuestionId || null }),
+    ...(q.showIfOption !== undefined && { show_if_option: q.showIfOption })
+  };
+}
+
+export function mapDbToApplicationFormTemplate(db: Record<string, unknown>): ApplicationFormTemplate {
+  return {
+    id: db.id as string,
+    name: db.name as string,
+    description: db.description as string | undefined,
+    fileUrl: db.file_url as string | undefined,
+    fields: (db.fields as ApplicationFormTemplate['fields']) ?? [],
+    status: db.status as ApplicationFormTemplate['status'],
+    createdBy: db.created_by as string | undefined,
+    createdAt: db.created_at as string
+  };
+}
+
+export function mapApplicationFormTemplateToDb(t: Partial<ApplicationFormTemplate>): Record<string, unknown> {
+  return {
+    ...(t.id && { id: t.id }),
+    ...(t.name && { name: t.name }),
+    ...(t.description !== undefined && { description: t.description }),
+    ...(t.fileUrl !== undefined && { file_url: t.fileUrl }),
+    ...(t.fields && { fields: t.fields }),
+    ...(t.status && { status: t.status }),
+    ...(t.createdBy && { created_by: t.createdBy })
+  };
+}
+
+export function mapDbToCampaignAiDraft(db: Record<string, unknown>): CampaignAiDraft {
+  return {
+    id: db.id as string,
+    campaignId: db.campaign_id as string | undefined,
+    promptText: db.prompt_text as string,
+    generatedConfig: db.generated_config as Record<string, unknown>,
+    status: db.status as CampaignAiDraft['status'],
+    createdBy: db.created_by as string | undefined,
+    reviewedBy: db.reviewed_by as string | undefined,
+    reviewedAt: db.reviewed_at as string | undefined,
+    createdAt: db.created_at as string
+  };
+}
+
+export function mapCampaignAiDraftToDb(d: Partial<CampaignAiDraft>): Record<string, unknown> {
+  return {
+    ...(d.id && { id: d.id }),
+    ...(d.campaignId !== undefined && { campaign_id: d.campaignId || null }),
+    ...(d.promptText && { prompt_text: d.promptText }),
+    ...(d.generatedConfig && { generated_config: d.generatedConfig }),
+    ...(d.status && { status: d.status }),
+    ...(d.createdBy && { created_by: d.createdBy }),
+    ...(d.reviewedBy !== undefined && { reviewed_by: d.reviewedBy || null }),
+    ...(d.reviewedAt !== undefined && { reviewed_at: d.reviewedAt })
   };
 }
 
@@ -465,6 +540,27 @@ export function mapCampaignFaqToDb(faq: any): any {
     ...(faq.question && { question: faq.question }),
     ...(faq.answer && { answer: faq.answer }),
     ...(faq.orderIndex !== undefined && { order_index: faq.orderIndex })
+  };
+}
+
+export function mapDbToCampaignMedia(db: Record<string, unknown>): CampaignMedia {
+  return {
+    id: db.id as string,
+    campaignId: db.campaign_id as string,
+    fileUrl: db.file_url as string,
+    type: db.type as string,
+    title: db.title as string | undefined,
+    createdAt: db.created_at as string
+  };
+}
+
+export function mapCampaignMediaToDb(m: Partial<CampaignMedia>): Record<string, unknown> {
+  return {
+    ...(m.id && { id: m.id }),
+    ...(m.campaignId && { campaign_id: m.campaignId }),
+    ...(m.fileUrl && { file_url: m.fileUrl }),
+    ...(m.type && { type: m.type }),
+    ...(m.title !== undefined && { title: m.title })
   };
 }
 

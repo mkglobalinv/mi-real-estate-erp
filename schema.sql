@@ -374,3 +374,103 @@ CREATE TABLE IF NOT EXISTS public.applications (
     approved_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ============================================================================
+-- 26. LANDING PAGE AGENT / CAMPAIGN BUILDER — PHASE 1 FOUNDATION
+-- Additive, backward-compatible extensions to the EXISTING campaign system.
+-- No existing table, column, or constraint is altered or dropped.
+-- Every statement is idempotent (safe to re-run against a DB that has
+-- already had this section applied).
+-- Campaign status management reuses the existing campaigns.status column
+-- (Draft/Active/Paused/Archived/Ended) — no schema change required there.
+-- ============================================================================
+
+-- 26.1 Campaign language configuration
+ALTER TABLE public.campaigns
+  ADD COLUMN IF NOT EXISTS supported_languages JSONB DEFAULT '["English","Hausa"]'::jsonb,
+  ADD COLUMN IF NOT EXISTS default_language TEXT DEFAULT 'English';
+
+-- 26.2 Formal greeting configuration
+-- greeting_config holds optional per-language greeting overrides, e.g.
+-- {"English": {"morning": "...", "afternoon": "...", "evening": "..."}, "Hausa": {...}}
+-- An empty object means "use the system default time-of-day greeting".
+ALTER TABLE public.campaigns
+  ADD COLUMN IF NOT EXISTS greeting_enabled BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS greeting_config JSONB DEFAULT '{}'::jsonb;
+
+-- 26.3 Conditional question branching + stable question keys
+-- question_key is a stable machine identifier (e.g. 'name', 'location',
+-- 'plot_size', 'purpose', 'payment_preference', 'timeline', 'readiness')
+-- used by the workflow engine, the WhatsApp handoff message builder, and
+-- the AI Builder to recognize well-known qualification questions without
+-- relying on free-text question wording. It is optional/nullable so all
+-- existing campaign_questions rows remain valid as-is.
+-- parent_question_id + show_if_option implement conditional branching:
+-- a child question is only shown if the parent question's answer equals
+-- show_if_option.
+ALTER TABLE public.campaign_questions
+  ADD COLUMN IF NOT EXISTS question_key TEXT,
+  ADD COLUMN IF NOT EXISTS parent_question_id UUID REFERENCES public.campaign_questions(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS show_if_option TEXT;
+
+-- 26.4 Optional pre-application form: official form templates.
+-- New, additive table. Deliberately NOT the existing `applications` table —
+-- this only models the reusable form template an Admin can select for a
+-- campaign. It does not create ERP application records by itself.
+CREATE TABLE IF NOT EXISTS public.application_form_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT NOT NULL,
+    description TEXT,
+    -- The actual official form (a hosted PDF/document URL or external form
+    -- link), mirroring the existing documents.file_url convention — this is
+    -- the real ERP application form, not a newly invented form builder.
+    file_url TEXT,
+    fields JSONB NOT NULL DEFAULT '[]'::jsonb,
+    status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Safe to re-run against a DB that already had this table from an earlier
+-- application of this section, before file_url existed.
+ALTER TABLE public.application_form_templates
+  ADD COLUMN IF NOT EXISTS file_url TEXT;
+
+ALTER TABLE public.campaigns
+  ADD COLUMN IF NOT EXISTS pre_application_enabled BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS application_form_template_id UUID REFERENCES public.application_form_templates(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS pre_application_prompt TEXT;
+
+-- 26.5 WhatsApp handoff configuration
+-- campaigns.whatsapp_number already exists (section 15) and remains the
+-- per-campaign number override. whatsapp_message_template is an optional
+-- override of the default handoff message text; NULL means "use system
+-- default template".
+ALTER TABLE public.campaigns
+  ADD COLUMN IF NOT EXISTS whatsapp_message_template TEXT;
+
+-- 26.6 AI Builder drafts.
+-- New, additive table. An AI draft is NEVER written into `campaigns`
+-- directly — it only becomes a live campaign once an Admin reviews and
+-- approves it (application-layer rule enforced in Phase 11).
+CREATE TABLE IF NOT EXISTS public.campaign_ai_drafts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL,
+    prompt_text TEXT NOT NULL,
+    generated_config JSONB NOT NULL,
+    status TEXT DEFAULT 'Pending Review' CHECK (status IN ('Pending Review', 'Approved', 'Rejected')),
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
+-- PHASE 9 — lead_submissions -> leads relationship.
+-- Additive FK only. Existing lead_submissions rows are unaffected (lead_id
+-- defaults to NULL); api.submitCampaignLead() now sets it on new
+-- submissions instead of only linking the two by a notes-string summary.
+-- Does not touch the existing applications/customer workflow.
+-- ============================================================================
+ALTER TABLE public.lead_submissions
+  ADD COLUMN IF NOT EXISTS lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL;
