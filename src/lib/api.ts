@@ -896,6 +896,18 @@ export const api = {
     return [];
   },
 
+  // Submissions for a campaign, with their lead score attached — used by
+  // the campaign analytics/leads view.
+  async getCampaignSubmissions(campaignId: string): Promise<unknown[]> {
+    const { data, error } = await getSupabase()
+      .from('lead_submissions')
+      .select('*, lead_scores(score, category)')
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data || [];
+  },
+
   async getTickets(): Promise<CustomerCareTicket[]> {
     return this.getCustomerCareTickets();
   },
