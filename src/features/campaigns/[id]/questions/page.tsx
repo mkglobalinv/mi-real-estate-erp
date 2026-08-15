@@ -22,11 +22,16 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
   const [currentQuestion, setCurrentQuestion] = useState<Partial<CampaignQuestion>>({
     type: 'Text',
     questionText: '',
+    questionTextHausa: '',
     options: [],
+    optionsHausa: [],
+    optionsScores: [],
     isRequired: true,
     orderIndex: 0
   });
   const [optionsInput, setOptionsInput] = useState('');
+  const [optionsHausaInput, setOptionsHausaInput] = useState('');
+  const [optionsScoresInput, setOptionsScoresInput] = useState('');
 
   const loadData = async () => {
     try {
@@ -64,6 +69,12 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
         campaignId,
         options: (currentQuestion.type === 'Radio' || currentQuestion.type === 'Dropdown') 
           ? optionsInput.split(',').map(s => s.trim()).filter(Boolean) 
+          : [],
+        optionsHausa: (currentQuestion.type === 'Radio' || currentQuestion.type === 'Dropdown') && optionsHausaInput
+          ? optionsHausaInput.split(',').map(s => s.trim()).filter(Boolean)
+          : [],
+        optionsScores: (currentQuestion.type === 'Radio' || currentQuestion.type === 'Dropdown') && optionsScoresInput
+          ? optionsScoresInput.split(',').map(s => Number(s.trim()) || 0)
           : []
       };
       
@@ -77,8 +88,10 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
       
       // Reset form
       setIsEditing(false);
-      setCurrentQuestion({ type: 'Text', questionText: '', options: [], isRequired: true, orderIndex: questions.length + 1 });
+      setCurrentQuestion({ type: 'Text', questionText: '', questionTextHausa: '', options: [], optionsHausa: [], optionsScores: [], isRequired: true, orderIndex: questions.length + 1 });
       setOptionsInput('');
+      setOptionsHausaInput('');
+      setOptionsScoresInput('');
       loadData();
     } catch (error) {
       toast.error('Failed to save question');
@@ -100,6 +113,8 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
   const handleEdit = (q: CampaignQuestion) => {
     setCurrentQuestion(q);
     setOptionsInput(q.options?.join(', ') || '');
+    setOptionsHausaInput(q.optionsHausa?.join(', ') || '');
+    setOptionsScoresInput(q.optionsScores?.join(', ') || '');
     setIsEditing(true);
   };
 
@@ -152,17 +167,50 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Question Text (Hausa)</label>
+                <input
+                  type="text"
+                  value={currentQuestion.questionTextHausa || ''}
+                  onChange={(e) => setCurrentQuestion({...currentQuestion, questionTextHausa: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none"
+                  placeholder="Hausa translation..."
+                />
+              </div>
+
               {(currentQuestion.type === 'Radio' || currentQuestion.type === 'Dropdown') && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Options (Comma separated)</label>
-                  <input
-                    type="text"
-                    required
-                    value={optionsInput}
-                    onChange={(e) => setOptionsInput(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none"
-                    placeholder="e.g. Option A, Option B, Option C"
-                  />
+                <div className="space-y-4 border p-4 rounded-lg bg-gray-50 border-gray-200">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Options (English) *</label>
+                    <input
+                      type="text"
+                      required
+                      value={optionsInput}
+                      onChange={(e) => setOptionsInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none"
+                      placeholder="e.g. Yes, No (Comma separated)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Options (Hausa)</label>
+                    <input
+                      type="text"
+                      value={optionsHausaInput}
+                      onChange={(e) => setOptionsHausaInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none"
+                      placeholder="e.g. Eh, Aa (Must match English order)"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Option Scores</label>
+                    <input
+                      type="text"
+                      value={optionsScoresInput}
+                      onChange={(e) => setOptionsScoresInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-[var(--color-primary)] focus:outline-none"
+                      placeholder="e.g. 10, 0 (Scores assigned to each option)"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -281,7 +329,15 @@ export default function CampaignQuestionsPage({ basePath = '/admin', params: rou
                       </div>
                       <p className="font-semibold text-gray-900">{q.questionText}</p>
                       {q.options && q.options.length > 0 && (
-                        <p className="text-sm text-gray-500 mt-1">Options: {q.options.join(', ')}</p>
+                        <div className="mt-2 text-sm">
+                          <p className="text-gray-500"><strong className="text-gray-600">EN:</strong> {q.options.join(', ')}</p>
+                          {q.optionsHausa && q.optionsHausa.length > 0 && (
+                            <p className="text-gray-500"><strong className="text-gray-600">HA:</strong> {q.optionsHausa.join(', ')}</p>
+                          )}
+                          {q.optionsScores && q.optionsScores.length > 0 && (
+                            <p className="text-gray-500"><strong className="text-gray-600">Scores:</strong> {q.optionsScores.join(', ')}</p>
+                          )}
+                        </div>
                       )}
                       {q.parentQuestionId && (
                         <p className="text-xs text-purple-600 mt-1 flex items-center gap-1">

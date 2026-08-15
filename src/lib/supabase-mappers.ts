@@ -411,7 +411,13 @@ export function mapDbToCampaign(db: any): any {
     whatsappMessageTemplate: db.whatsapp_message_template,
     createdAt: db.created_at,
     clicks: db.campaign_analytics?.[0]?.count ?? 0,
-    leadsGenerated: db.lead_submissions?.[0]?.count ?? 0
+    leadsGenerated: db.lead_submissions?.[0]?.count ?? 0,
+    hotThreshold: db.hot_threshold ?? 90,
+    warmThreshold: db.warm_threshold ?? 60,
+    termsAndConditions: db.terms_and_conditions,
+    termsAndConditionsHausa: db.terms_and_conditions_hausa,
+    cancellationRules: db.cancellation_rules,
+    cancellationRulesHausa: db.cancellation_rules_hausa
   };
 }
 
@@ -435,7 +441,13 @@ export function mapCampaignToDb(camp: any): any {
     ...(camp.preApplicationEnabled !== undefined && { pre_application_enabled: camp.preApplicationEnabled }),
     ...(camp.applicationFormTemplateId !== undefined && { application_form_template_id: camp.applicationFormTemplateId || null }),
     ...(camp.preApplicationPrompt !== undefined && { pre_application_prompt: camp.preApplicationPrompt }),
-    ...(camp.whatsappMessageTemplate !== undefined && { whatsapp_message_template: camp.whatsappMessageTemplate })
+    ...(camp.whatsappMessageTemplate !== undefined && { whatsapp_message_template: camp.whatsappMessageTemplate }),
+    ...(camp.hotThreshold !== undefined && { hot_threshold: camp.hotThreshold }),
+    ...(camp.warmThreshold !== undefined && { warm_threshold: camp.warmThreshold }),
+    ...(camp.termsAndConditions !== undefined && { terms_and_conditions: camp.termsAndConditions }),
+    ...(camp.termsAndConditionsHausa !== undefined && { terms_and_conditions_hausa: camp.termsAndConditionsHausa }),
+    ...(camp.cancellationRules !== undefined && { cancellation_rules: camp.cancellationRules }),
+    ...(camp.cancellationRulesHausa !== undefined && { cancellation_rules_hausa: camp.cancellationRulesHausa })
   };
 }
 
@@ -451,6 +463,9 @@ export function mapDbToCampaignQuestion(db: any): any {
     questionKey: db.question_key,
     parentQuestionId: db.parent_question_id,
     showIfOption: db.show_if_option,
+    questionTextHausa: db.question_text_hausa,
+    optionsHausa: typeof db.options_hausa === 'string' ? JSON.parse(db.options_hausa) : db.options_hausa,
+    optionsScores: typeof db.options_scores === 'string' ? JSON.parse(db.options_scores) : db.options_scores,
     createdAt: db.created_at
   };
 }
@@ -466,7 +481,41 @@ export function mapCampaignQuestionToDb(q: any): any {
     ...(q.isRequired !== undefined && { is_required: q.isRequired }),
     ...(q.questionKey !== undefined && { question_key: q.questionKey }),
     ...(q.parentQuestionId !== undefined && { parent_question_id: q.parentQuestionId || null }),
-    ...(q.showIfOption !== undefined && { show_if_option: q.showIfOption })
+    ...(q.showIfOption !== undefined && { show_if_option: q.showIfOption }),
+    ...(q.questionTextHausa !== undefined && { question_text_hausa: q.questionTextHausa }),
+    ...(q.optionsHausa !== undefined && { options_hausa: q.optionsHausa }),
+    ...(q.optionsScores !== undefined && { options_scores: q.optionsScores })
+  };
+}
+
+export function mapDbToCampaignPackage(db: any): any {
+  return {
+    id: db.id,
+    campaignId: db.campaign_id,
+    name: db.name,
+    nameHausa: db.name_hausa,
+    outrightPrice: Number(db.outright_price),
+    initialDeposit: Number(db.initial_deposit),
+    monthlyInstallment: Number(db.monthly_installment),
+    durationMonths: Number(db.duration_months),
+    description: db.description,
+    descriptionHausa: db.description_hausa,
+    createdAt: db.created_at
+  };
+}
+
+export function mapCampaignPackageToDb(pkg: any): any {
+  return {
+    ...(pkg.id && { id: pkg.id }),
+    ...(pkg.campaignId && { campaign_id: pkg.campaignId }),
+    ...(pkg.name !== undefined && { name: pkg.name }),
+    ...(pkg.nameHausa !== undefined && { name_hausa: pkg.nameHausa }),
+    ...(pkg.outrightPrice !== undefined && { outright_price: pkg.outrightPrice }),
+    ...(pkg.initialDeposit !== undefined && { initial_deposit: pkg.initialDeposit }),
+    ...(pkg.monthlyInstallment !== undefined && { monthly_installment: pkg.monthlyInstallment }),
+    ...(pkg.durationMonths !== undefined && { duration_months: pkg.durationMonths }),
+    ...(pkg.description !== undefined && { description: pkg.description }),
+    ...(pkg.descriptionHausa !== undefined && { description_hausa: pkg.descriptionHausa })
   };
 }
 

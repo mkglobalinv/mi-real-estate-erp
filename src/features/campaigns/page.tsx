@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Campaign } from '@/lib/types';
 import Link from 'next/link';
-import { ExternalLink, Plus, Search, Edit, Trash2, Settings, ListPlus, MessageSquare, Copy, Play, Pause, Archive, BarChart3, Sparkles } from 'lucide-react';
+import { ExternalLink, Plus, Search, Edit, Trash2, Settings, ListPlus, MessageSquare, Copy, Play, Pause, Archive, BarChart3, Sparkles, Wallet } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AdminCampaignsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
@@ -157,6 +157,9 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
                       </Link>
                       <Link href={`${basePath}/campaigns/${camp.id}/faqs`} title="Manage FAQs" className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg">
                         <MessageSquare className="w-4 h-4" />
+                      </Link>
+                      <Link href={`${basePath}/campaigns/${camp.id}/packages`} title="Manage Packages" className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg">
+                        <Wallet className="w-4 h-4" />
                       </Link>
                       <Link href={`${basePath}/campaigns/${camp.id}/analytics`} title="View Analytics & Leads" className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg">
                         <BarChart3 className="w-4 h-4" />
