@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { createClient } from '@/utils/supabase/server';
 
 // AI Builder — Phase 11. This route only ever produces a DRAFT row in
@@ -9,9 +9,9 @@ import { createClient } from '@/utils/supabase/server';
 // applications/customers/payments/allocations at all.
 const SYSTEM_PROMPT = `You are a configuration assistant for M.I. Real Estate and General Enterprises Ltd's Landing Page Agent / Campaign Builder.
 
-Convert the Admin's natural-language description into a structured DRAFT campaign configuration. Follow these rules exactly:
+Convert the Admin's natural-language description into a structured DRAFT campaign configuration. Follow these rules exactly and output ONLY a JSON object:
 
-1. Output ONLY the fields defined by the schema. Do not invent or output real estate prices, plot sizes, discounts, payment plan amounts, or availability figures — these are business-specific facts only the Admin knows and must supply.
+1. Output ONLY the JSON fields defined by the schema. Do not invent or output real estate prices, plot sizes, discounts, payment plan amounts, or availability figures — these are business-specific facts only the Admin knows and must supply.
 2. If the Admin's description implies a question that would need specific numeric options (exact plot sizes, exact prices, specific payment plan lengths), create that question as free-text type "Text" instead of inventing option values. Do not fabricate a list of plot sizes or prices as Radio/Dropdown options.
 3. Do not redesign, drop, or reorder qualification questions the Admin explicitly described. Only include questions the description actually implies — do not add extra ones.
 4. For a conditional follow-up ("if they choose installment, ask about the plan"), set parentQuestionKey and showIfOption on the follow-up question, referencing the exact option text of its parent question, and give every question referenced this way a stable questionKey.
@@ -71,36 +71,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'A campaign description prompt is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: 'AI Builder is not configured (missing ANTHROPIC_API_KEY)' }, { status: 500 });
+      return NextResponse.json({ error: 'AI Builder is not configured (missing OPENAI_API_KEY)' }, { status: 500 });
     }
 
-    const anthropic = new Anthropic({ apiKey });
+    const openai = new OpenAI({ apiKey });
 
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-5',
-      max_tokens: 4096,
-      output_config: {
-        effort: 'medium',
-        format: { type: 'json_schema', schema: DRAFT_SCHEMA }
-      },
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }]
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: prompt }
+      ],
+      response_format: { type: 'json_object' }
     });
 
-    if (response.stop_reason === 'refusal') {
-      return NextResponse.json({ error: 'The AI declined to generate this campaign. Try rephrasing the description.' }, { status: 422 });
-    }
-
-    const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
-    if (!textBlock) {
+    const responseContent = response.choices[0]?.message?.content;
+    if (!responseContent) {
       return NextResponse.json({ error: 'AI did not return a usable draft' }, { status: 502 });
     }
 
     let generatedConfig: unknown;
     try {
-      generatedConfig = JSON.parse(textBlock.text);
+      generatedConfig = JSON.parse(responseContent);
     } catch {
       return NextResponse.json({ error: 'AI returned malformed configuration' }, { status: 502 });
     }
