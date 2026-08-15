@@ -57,7 +57,12 @@ export default function CampaignForm({ initialData, isEdit, basePath = '/admin' 
 
     setLoading(true);
     try {
-      await api.saveCampaign(formData);
+      const saved = await api.saveCampaign(formData);
+      if (!isEdit) {
+        // New campaign: seed the approved default qualification questions
+        // so it has a working, Admin-editable flow immediately.
+        await api.seedDefaultCampaignQuestions(saved.id).catch(err => console.error('Failed to seed default questions', err));
+      }
       toast.success(`Campaign ${isEdit ? 'updated' : 'created'} successfully`);
       router.push(`${basePath}/campaigns`);
     } catch (error) {

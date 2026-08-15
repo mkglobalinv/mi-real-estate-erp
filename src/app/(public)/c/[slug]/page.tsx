@@ -7,6 +7,7 @@ import CampaignWizard from '@/components/CampaignWizard';
 import Image from 'next/image';
 import { api } from '@/lib/api';
 import { Campaign, CampaignQuestion, Project, CampaignMedia, CampaignFaq, Location } from '@/lib/types';
+import { buildFallbackQuestions } from '@/lib/defaultCampaignQuestions';
 
 export default function CampaignLandingPage() {
   const { slug } = useParams();
@@ -28,14 +29,12 @@ export default function CampaignLandingPage() {
           if (camp) {
             setCampaign(camp);
 
-            // Default questions if none exist
+            // New campaigns are seeded with the default qualification
+            // questions on creation (see CampaignForm); this fallback only
+            // covers campaigns created before that existed.
             let qs = await api.getCampaignQuestions(camp.id);
             if (qs.length === 0) {
-              qs = [
-                { id: 'q1', campaignId: camp.id, type: 'Radio', questionText: 'Are you ready to start payment immediately?', options: ['Yes, Immediate', 'In 30 Days', 'Not yet'], orderIndex: 1, isRequired: true, createdAt: '' },
-                { id: 'q2', campaignId: camp.id, type: 'Radio', questionText: 'What is your timeline for acquisition?', options: ['Immediate', 'Within 30 Days', 'Within 90 Days', 'Just researching'], orderIndex: 2, isRequired: true, createdAt: '' },
-                { id: 'q3', campaignId: camp.id, type: 'Radio', questionText: 'Can you pay the initial form fee today?', options: ['Yes I can', 'Maybe later', 'No'], orderIndex: 3, isRequired: true, createdAt: '' },
-              ];
+              qs = buildFallbackQuestions(camp.id);
             }
             setQuestions(qs);
 

@@ -3,6 +3,7 @@ import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadT
 import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
+import { DEFAULT_QUALIFICATION_QUESTIONS } from './defaultCampaignQuestions';
 
 // We use the browser client for the UI data layer
 const getSupabase = () => createClient();
@@ -701,6 +702,19 @@ export const api = {
   async deleteCampaignQuestion(id: string): Promise<void> {
     const { error } = await getSupabase().from('campaign_questions').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  // Seeds a brand-new campaign with the approved default qualification
+  // questions so it has a working, Admin-editable flow immediately
+  // (rather than the public page silently using an in-memory fallback
+  // Admin can never see or edit).
+  async seedDefaultCampaignQuestions(campaignId: string): Promise<CampaignQuestion[]> {
+    const created: CampaignQuestion[] = [];
+    for (const q of DEFAULT_QUALIFICATION_QUESTIONS) {
+      const saved = await this.saveCampaignQuestion({ ...q, campaignId });
+      created.push(saved);
+    }
+    return created;
   },
 
   // --- CAMPAIGN FAQS ---

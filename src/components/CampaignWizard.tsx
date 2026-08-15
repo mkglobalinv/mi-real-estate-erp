@@ -10,6 +10,49 @@ import { getWizardStrings, getFormalGreeting, SUPPORTED_LANGUAGES, WizardLanguag
 
 type Phase = 'greeting' | 'language' | 'wizard';
 
+// Owns its own input state so it naturally resets/restores whenever the
+// enclosing question step remounts (its parent motion.div already changes
+// `key` per step) — no effect-driven state sync needed.
+function QuestionTextInput({ question, initialValue, onSubmit, continueLabel }: {
+  question: CampaignQuestion;
+  initialValue: string;
+  onSubmit: (text: string) => void;
+  continueLabel: string;
+}) {
+  const [value, setValue] = useState(initialValue);
+  return (
+    <div className="mb-8">
+      {question.type === 'Text Area' ? (
+        <textarea
+          autoFocus
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          rows={4}
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none text-lg"
+        />
+      ) : (
+        <input
+          autoFocus
+          type={question.type === 'Number' ? 'number' : question.type === 'Phone' ? 'tel' : 'text'}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && value.trim()) onSubmit(value.trim());
+          }}
+          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none text-lg"
+        />
+      )}
+      <button
+        onClick={() => onSubmit(value.trim())}
+        disabled={question.isRequired && !value.trim()}
+        className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {continueLabel} <ArrowRight className="w-5 h-5" />
+      </button>
+    </div>
+  );
+}
+
 export default function CampaignWizard({ campaign, questions }: { campaign: Campaign, questions: CampaignQuestion[] }) {
   const sessionKey = `mire-campaign-lang-${campaign.id}`;
   const greetingEnabled = campaign.greetingEnabled !== false;
@@ -25,11 +68,14 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
   const t = getWizardStrings(language);
 
   // If this browser session already picked a language for this campaign,
-  // don't re-ask — jump straight into the wizard with that language.
+  // don't re-ask — jump straight into the wizard with that language. This
+  // is a legitimate one-time sync with an external system (browser storage)
+  // that must run client-only; sessionStorage isn't available during SSR.
   useEffect(() => {
     try {
       const savedLang = sessionStorage.getItem(sessionKey);
       if (savedLang && SUPPORTED_LANGUAGES.includes(savedLang as WizardLanguage)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLanguage(savedLang as WizardLanguage);
         setPhase('wizard');
       }
@@ -45,6 +91,13 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
       api.trackCampaignEvent(campaign.id, 'wizard_start').catch(console.error);
     }
   }, [phase, currentStep, campaign.id]);
+
+  // If a qualification question already asked for the customer's name
+  // (questionKey 'name'), reuse that answer instead of asking again on the
+  // contact step — computed at render time, not synced via an effect.
+  const nameQuestion = questions.find(q => q.questionKey === 'name');
+  const nameFromAnswers = nameQuestion ? answers.find(a => a.questionId === nameQuestion.id)?.answerText : undefined;
+  const displayName = contactData.name || nameFromAnswers || '';
 
   const chooseLanguage = (lang: WizardLanguage) => {
     setLanguage(lang);
@@ -69,7 +122,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
   };
 
   const submitLead = async () => {
-    if (!contactData.name || !contactData.phone) return;
+    if (!displayName || !contactData.phone) return;
     setLoading(true);
 
     const scoreResult = calculateLeadScore(answers);
@@ -78,7 +131,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
     try {
       await api.submitCampaignLead(
         campaign.id,
-        { name: contactData.name, phone: contactData.phone },
+        { name: displayName, phone: contactData.phone },
         answers,
         scoreResult
       );
@@ -100,7 +153,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
   const generateWhatsAppLink = () => {
     const phone = campaign.whatsappNumber || '08069375042';
     const answersSummary = answers.map(a => `${a.questionText}: ${a.answerText}`).join('\n');
-    const msg = `Hello! I am ${contactData.name}.\nI just completed the qualification for the ${campaign.name} campaign.\n\nMy Details:\n${answersSummary}\n\nPriority: ${finalScore.category} (${finalScore.score} pts)\nPhone: ${contactData.phone}\n\nI would like to proceed!`;
+    const msg = `Hello! I am ${displayName}.\nI just completed the qualification for the ${campaign.name} campaign.\n\nMy Details:\n${answersSummary}\n\nPriority: ${finalScore.category} (${finalScore.score} pts)\nPhone: ${contactData.phone}\n\nI would like to proceed!`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -190,18 +243,27 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
                 </h3>
               </div>
 
-              <div className="grid gap-3 mb-8">
-                {questions[currentStep].options?.map(opt => (
-                  <button
-                    key={opt}
-                    onClick={() => handleAnswer(questions[currentStep].id, questions[currentStep].questionText, opt)}
-                    className="p-4 rounded-xl border border-gray-200 text-left transition-colors text-gray-700 hover:border-green-300 hover:bg-green-50 text-lg group flex items-center justify-between"
-                  >
-                    {opt}
-                    <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ))}
-              </div>
+              {(questions[currentStep].type === 'Radio' || questions[currentStep].type === 'Dropdown') ? (
+                <div className="grid gap-3 mb-8">
+                  {questions[currentStep].options?.map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => handleAnswer(questions[currentStep].id, questions[currentStep].questionText, opt)}
+                      className="p-4 rounded-xl border border-gray-200 text-left transition-colors text-gray-700 hover:border-green-300 hover:bg-green-50 text-lg group flex items-center justify-between"
+                    >
+                      {opt}
+                      <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <QuestionTextInput
+                  question={questions[currentStep]}
+                  initialValue={answers.find(a => a.questionId === questions[currentStep].id)?.answerText || ''}
+                  onSubmit={text => handleAnswer(questions[currentStep].id, questions[currentStep].questionText, text)}
+                  continueLabel={t.continueButton}
+                />
+              )}
 
               <div className="flex justify-between mt-auto pt-4">
                 <button
@@ -226,7 +288,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
               <div className="space-y-4 mb-8">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.fullNameLabel}</label>
-                  <input type="text" value={contactData.name} onChange={e => setContactData({...contactData, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none" placeholder={t.fullNamePlaceholder} />
+                  <input type="text" value={displayName} onChange={e => setContactData({...contactData, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none" placeholder={t.fullNamePlaceholder} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneLabel}</label>
@@ -238,7 +300,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
                 <button onClick={() => setCurrentStep(prev => prev - 1)} className="text-gray-500 font-medium px-4 py-2 hover:bg-gray-100 rounded-lg">{t.backButton}</button>
                 <button
                   onClick={submitLead}
-                  disabled={!contactData.name || !contactData.phone || loading}
+                  disabled={!displayName || !contactData.phone || loading}
                   className="btn-accent py-3 px-8 text-base flex items-center justify-center min-w-[150px] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? t.processingButton : t.completeButton}
@@ -255,7 +317,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
               </div>
               <h3 className="text-2xl font-bold text-gray-800 mb-2">{t.successHeading}</h3>
               <p className="text-gray-600 mb-8 text-lg">
-                {t.successSubtext(contactData.name, finalScore.category)}
+                {t.successSubtext(displayName, finalScore.category)}
               </p>
 
               <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-8 text-left">
