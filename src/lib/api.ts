@@ -782,6 +782,12 @@ export const api = {
     return mapDbToApplicationFormTemplate(data);
   },
 
+  async getApplicationFormTemplateById(id: string): Promise<ApplicationFormTemplate | null> {
+    const { data, error } = await getSupabase().from('application_form_templates').select('*').eq('id', id).maybeSingle();
+    if (error || !data) return null;
+    return mapDbToApplicationFormTemplate(data);
+  },
+
   // --- CAMPAIGN AI DRAFTS (Landing Page Agent: AI Builder draft -> review -> approve) ---
   async getCampaignAiDrafts(campaignId?: string): Promise<CampaignAiDraft[]> {
     let query = getSupabase().from('campaign_ai_drafts').select('*').order('created_at', { ascending: false });

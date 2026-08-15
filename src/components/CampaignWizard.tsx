@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { ArrowRight, CheckCircle, MessageCircle, User, Globe } from 'lucide-react';
 import { calculateLeadScore } from '@/lib/scoring';
-import { Campaign, CampaignQuestion } from '@/lib/types';
+import { Campaign, CampaignQuestion, ApplicationFormTemplate } from '@/lib/types';
 import { getWizardStrings, getFormalGreeting, SUPPORTED_LANGUAGES, WizardLanguage } from '@/lib/campaignWizardStrings';
 
 type Phase = 'greeting' | 'language' | 'wizard';
@@ -64,8 +64,19 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
   const [contactData, setContactData] = useState({ name: '', phone: '' });
   const [loading, setLoading] = useState(false);
   const [finalScore, setFinalScore] = useState<{score: number; category: string}>({ score: 0, category: 'Cold' });
+  const [formTemplate, setFormTemplate] = useState<ApplicationFormTemplate | null>(null);
+  const [formOpened, setFormOpened] = useState(false);
 
   const t = getWizardStrings(language);
+  const showPreApplication = !!campaign.preApplicationEnabled && !!campaign.applicationFormTemplateId;
+
+  // Fetch the selected official application form template — a genuine
+  // async data load from an external system, the documented case for effects.
+  useEffect(() => {
+    if (campaign.applicationFormTemplateId) {
+      api.getApplicationFormTemplateById(campaign.applicationFormTemplateId).then(setFormTemplate).catch(console.error);
+    }
+  }, [campaign.applicationFormTemplateId]);
 
   // If this browser session already picked a language for this campaign,
   // don't re-ask — jump straight into the wizard with that language. This
@@ -148,7 +159,10 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
       await api.trackCampaignEvent(campaign.id, 'wizard_complete');
       await api.trackCampaignEvent(campaign.id, 'lead_created');
       await api.trackCampaignEvent(campaign.id, 'lead_converted');
-      setCurrentStep(visibleQuestions.length + 1); // Go to success
+      // Optional Pre-Application Form → WhatsApp Handoff, per the approved
+      // customer workflow. If disabled (or no form configured), go straight
+      // to WhatsApp — this step is never skipped, only ever the target.
+      setCurrentStep(visibleQuestions.length + 1);
     } catch (err) {
       console.error(err);
     } finally {
@@ -158,6 +172,16 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
 
   const trackWhatsAppClick = () => {
     api.trackCampaignEvent(campaign.id, 'whatsapp_click').catch(console.error);
+  };
+
+  const respondToPreApplication = (agreed: boolean) => {
+    api.trackCampaignEvent(campaign.id, agreed ? 'pre_application_accepted' : 'pre_application_declined').catch(console.error);
+    if (agreed && formTemplate?.fileUrl) {
+      window.open(formTemplate.fileUrl, '_blank', 'noopener,noreferrer');
+      setFormOpened(true);
+    }
+    // Either way, the workflow continues to WhatsApp handoff next.
+    setCurrentStep(prev => prev + 1);
   };
 
   const generateWhatsAppLink = () => {
@@ -319,8 +343,28 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
             </motion.div>
           )}
 
+          {/* Optional Pre-Application Form Step */}
+          {phase === 'wizard' && showPreApplication && currentStep === visibleQuestions.length + 1 && (
+            <motion.div key="pre-application" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center">
+              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <User className="w-10 h-10 text-[var(--color-primary)]" />
+              </div>
+              <p className="text-gray-800 mb-8 text-lg font-medium leading-relaxed">
+                {campaign.preApplicationPrompt || t.defaultPreApplicationPrompt}
+              </p>
+              <div className="grid gap-3 max-w-sm mx-auto">
+                <button onClick={() => respondToPreApplication(true)} className="btn-primary py-4 text-lg">
+                  {t.yesButton}
+                </button>
+                <button onClick={() => respondToPreApplication(false)} className="text-gray-500 font-medium px-4 py-3 hover:bg-gray-100 rounded-lg">
+                  {t.noButton}
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {/* Success Step (WhatsApp Handoff) */}
-          {phase === 'wizard' && currentStep === visibleQuestions.length + 1 && (
+          {phase === 'wizard' && currentStep === visibleQuestions.length + (showPreApplication ? 2 : 1) && (
             <motion.div key="success" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center py-8">
               <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-12 h-12 text-green-600" />
@@ -329,6 +373,15 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
               <p className="text-gray-600 mb-8 text-lg">
                 {t.successSubtext(displayName, finalScore.category)}
               </p>
+
+              {formOpened && formTemplate?.fileUrl && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 text-left text-sm text-blue-800">
+                  {t.formOpenedNote}{' '}
+                  <a href={formTemplate.fileUrl} target="_blank" rel="noopener noreferrer" className="font-bold underline">
+                    {t.openFormButton}
+                  </a>
+                </div>
+              )}
 
               <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-8 text-left">
                 <p className="font-bold text-green-800 mb-2">{t.nextStepLabel}</p>

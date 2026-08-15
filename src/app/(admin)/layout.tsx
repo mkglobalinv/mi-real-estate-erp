@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  Building2, LayoutDashboard, Users, MapPin, PlusCircle, 
+  Building2, LayoutDashboard, Users, MapPin, PlusCircle,
   Settings, Activity, Calendar, Wallet, CheckSquare, FolderGit2,
-  Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone
+  Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone, FileText
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
@@ -220,6 +220,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                     <Link href="/admin/settings" onClick={closeMenu} className={linkClass('/admin/settings')}>
                       <Settings className={iconClass('/admin/settings')} />
                       System Settings
+                    </Link>
+                    <Link href="/admin/settings/application-forms" onClick={closeMenu} className={linkClass('/admin/settings/application-forms')}>
+                      <FileText className={iconClass('/admin/settings/application-forms')} />
+                      Application Form Templates
                     </Link>
                     <div className="px-4 py-2 text-sm font-medium rounded-lg text-gray-600 flex items-center cursor-not-allowed">
                       <Shield className="flex-shrink-0 mr-3 w-5 h-5 opacity-40" /> User Roles Matrix

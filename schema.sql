@@ -421,11 +421,20 @@ CREATE TABLE IF NOT EXISTS public.application_form_templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     description TEXT,
+    -- The actual official form (a hosted PDF/document URL or external form
+    -- link), mirroring the existing documents.file_url convention — this is
+    -- the real ERP application form, not a newly invented form builder.
+    file_url TEXT,
     fields JSONB NOT NULL DEFAULT '[]'::jsonb,
     status TEXT DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
     created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Safe to re-run against a DB that already had this table from an earlier
+-- application of this section, before file_url existed.
+ALTER TABLE public.application_form_templates
+  ADD COLUMN IF NOT EXISTS file_url TEXT;
 
 ALTER TABLE public.campaigns
   ADD COLUMN IF NOT EXISTS pre_application_enabled BOOLEAN DEFAULT false,

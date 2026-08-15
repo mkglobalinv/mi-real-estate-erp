@@ -287,6 +287,9 @@ export interface ApplicationFormTemplate {
   id: string;
   name: string;
   description?: string;
+  // The actual official form document/link (hosted PDF or external form
+  // URL) — the real integration point, mirroring documents.file_url.
+  fileUrl?: string;
   fields: Array<{ key: string; label: string; type: string; required?: boolean }>;
   status: 'Active' | 'Inactive';
   createdBy?: string;

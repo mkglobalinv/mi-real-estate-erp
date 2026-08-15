@@ -475,6 +475,7 @@ export function mapDbToApplicationFormTemplate(db: Record<string, unknown>): App
     id: db.id as string,
     name: db.name as string,
     description: db.description as string | undefined,
+    fileUrl: db.file_url as string | undefined,
     fields: (db.fields as ApplicationFormTemplate['fields']) ?? [],
     status: db.status as ApplicationFormTemplate['status'],
     createdBy: db.created_by as string | undefined,
@@ -487,6 +488,7 @@ export function mapApplicationFormTemplateToDb(t: Partial<ApplicationFormTemplat
     ...(t.id && { id: t.id }),
     ...(t.name && { name: t.name }),
     ...(t.description !== undefined && { description: t.description }),
+    ...(t.fileUrl !== undefined && { file_url: t.fileUrl }),
     ...(t.fields && { fields: t.fields }),
     ...(t.status && { status: t.status }),
     ...(t.createdBy && { created_by: t.createdBy })

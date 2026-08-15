@@ -26,6 +26,11 @@ interface WizardStrings {
   changeLanguage: string;
   languagePrompt: string;
   continueButton: string;
+  defaultPreApplicationPrompt: string;
+  yesButton: string;
+  noButton: string;
+  openFormButton: string;
+  formOpenedNote: string;
 }
 
 const STRINGS: Record<WizardLanguage, WizardStrings> = {
@@ -50,7 +55,12 @@ const STRINGS: Record<WizardLanguage, WizardStrings> = {
     continueWhatsApp: 'Continue to WhatsApp',
     changeLanguage: 'Change language',
     languagePrompt: 'Can you continue with English or Hausa?',
-    continueButton: 'Continue'
+    continueButton: 'Continue',
+    defaultPreApplicationPrompt: 'Can we share you the form to fill before coming to our office and complete the agreement?',
+    yesButton: 'Yes, please',
+    noButton: 'No, thanks',
+    openFormButton: 'Open Application Form',
+    formOpenedNote: "We've opened the application form in a new tab. You can also continue to WhatsApp below."
   },
   Hausa: {
     welcomeHeading: 'Barka da zuwa!',
@@ -73,7 +83,12 @@ const STRINGS: Record<WizardLanguage, WizardStrings> = {
     continueWhatsApp: 'Ci gaba zuwa WhatsApp',
     changeLanguage: 'Canza Harshe',
     languagePrompt: 'Za ka iya ci gaba da Turanci ko Hausa?',
-    continueButton: 'Ci gaba'
+    continueButton: 'Ci gaba',
+    defaultPreApplicationPrompt: 'Za mu iya raba maka fom din da za ka cika kafin zuwa ofishinmu domin kammala yarjejeniya?',
+    yesButton: 'Ee, don Allah',
+    noButton: "A'a, na gode",
+    openFormButton: 'Bude Fom din Nema',
+    formOpenedNote: 'Mun bude fom din a shafi na daban. Hakanan za ka iya ci gaba zuwa WhatsApp a kasa.'
   }
 };
 
