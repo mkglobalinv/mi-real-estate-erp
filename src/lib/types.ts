@@ -86,6 +86,7 @@ export interface Project extends BaseRolePrep {
   name: string;
   description: string;
   location?: string;
+  locationId?: string;
   coverImage?: string;
   availableUnits: number;
   startingPrice: number;

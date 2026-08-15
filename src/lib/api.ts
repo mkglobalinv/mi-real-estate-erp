@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb } from './supabase-mappers';
-import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft } from './types';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb } from './supabase-mappers';
+import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
 
@@ -45,6 +45,12 @@ export const api = {
   async saveProject(proj: Partial<Project>): Promise<Project> {
     const { data, error } = await getSupabase().from('projects').upsert(proj).select().single();
     if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToProject(data);
+  },
+
+  async getProjectById(id: string): Promise<Project | null> {
+    const { data, error } = await getSupabase().from('projects').select('*').eq('id', id).maybeSingle();
+    if (error || !data) return null;
     return mapDbToProject(data);
   },
 
@@ -713,6 +719,25 @@ export const api = {
 
   async deleteCampaignFaq(id: string): Promise<void> {
     const { error } = await getSupabase().from('campaign_faqs').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // --- CAMPAIGN MEDIA (property presentation gallery) ---
+  async getCampaignMedia(campaignId: string): Promise<CampaignMedia[]> {
+    const { data, error } = await getSupabase().from('campaign_media').select('*').eq('campaign_id', campaignId).order('created_at', { ascending: true });
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return data ? data.map(mapDbToCampaignMedia) : [];
+  },
+
+  async saveCampaignMedia(media: Partial<CampaignMedia>): Promise<CampaignMedia> {
+    const mapped = mapCampaignMediaToDb(media);
+    const { data, error } = await getSupabase().from('campaign_media').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToCampaignMedia(data);
+  },
+
+  async deleteCampaignMedia(id: string): Promise<void> {
+    const { error } = await getSupabase().from('campaign_media').delete().eq('id', id);
     if (error) throw error;
   },
 

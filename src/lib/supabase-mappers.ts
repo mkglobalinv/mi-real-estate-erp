@@ -1,4 +1,4 @@
-import { PropertyListing, Project, Customer, Lead, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Allocation, Document, CustomerCareTicket, Receipt, InspectionBooking, Reservation, ApplicationFormTemplate, CampaignAiDraft } from './types';
+import { PropertyListing, Project, Customer, Lead, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Allocation, Document, CustomerCareTicket, Receipt, InspectionBooking, Reservation, ApplicationFormTemplate, CampaignAiDraft, CampaignMedia } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 
 export function mapDbToProperty(dbProp: any): PropertyListing {
@@ -53,6 +53,7 @@ export function mapDbToProject(db: any): Project {
     startingPrice: Number(db.starting_price),
     availableUnits: Number(db.available_units),
     coverImage: db.cover_image,
+    locationId: db.location_id,
     easyBuyStatus: db.easy_buy_status,
     createdAt: db.created_at
   };
@@ -537,6 +538,27 @@ export function mapCampaignFaqToDb(faq: any): any {
     ...(faq.question && { question: faq.question }),
     ...(faq.answer && { answer: faq.answer }),
     ...(faq.orderIndex !== undefined && { order_index: faq.orderIndex })
+  };
+}
+
+export function mapDbToCampaignMedia(db: Record<string, unknown>): CampaignMedia {
+  return {
+    id: db.id as string,
+    campaignId: db.campaign_id as string,
+    fileUrl: db.file_url as string,
+    type: db.type as string,
+    title: db.title as string | undefined,
+    createdAt: db.created_at as string
+  };
+}
+
+export function mapCampaignMediaToDb(m: Partial<CampaignMedia>): Record<string, unknown> {
+  return {
+    ...(m.id && { id: m.id }),
+    ...(m.campaignId && { campaign_id: m.campaignId }),
+    ...(m.fileUrl && { file_url: m.fileUrl }),
+    ...(m.type && { type: m.type }),
+    ...(m.title !== undefined && { title: m.title })
   };
 }
 

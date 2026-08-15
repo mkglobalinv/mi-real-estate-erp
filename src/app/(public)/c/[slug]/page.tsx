@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { CheckCircle } from 'lucide-react';
+import { MapPin, Wallet, LayoutGrid, HelpCircle } from 'lucide-react';
 import CampaignWizard from '@/components/CampaignWizard';
 import Image from 'next/image';
 import { api } from '@/lib/api';
-import { Campaign, CampaignQuestion } from '@/lib/types';
+import { Campaign, CampaignQuestion, Project, CampaignMedia, CampaignFaq, Location } from '@/lib/types';
 
 export default function CampaignLandingPage() {
   const { slug } = useParams();
@@ -14,6 +14,10 @@ export default function CampaignLandingPage() {
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [questions, setQuestions] = useState<CampaignQuestion[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
+  const [media, setMedia] = useState<CampaignMedia[]>([]);
+  const [faqs, setFaqs] = useState<CampaignFaq[]>([]);
+  const [locationName, setLocationName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,6 +27,7 @@ export default function CampaignLandingPage() {
           const camp = await api.getCampaignBySlug(slug);
           if (camp) {
             setCampaign(camp);
+
             // Default questions if none exist
             let qs = await api.getCampaignQuestions(camp.id);
             if (qs.length === 0) {
@@ -33,6 +38,24 @@ export default function CampaignLandingPage() {
               ];
             }
             setQuestions(qs);
+
+            // Property presentation data — all driven by the campaign's own
+            // configuration, never hard-coded per-campaign copy.
+            const [proj, mediaItems, faqItems] = await Promise.all([
+              camp.projectId ? api.getProjectById(camp.projectId) : Promise.resolve(null),
+              api.getCampaignMedia(camp.id),
+              api.getCampaignFaqs(camp.id)
+            ]);
+            setProject(proj);
+            setMedia(mediaItems);
+            setFaqs(faqItems);
+
+            if (proj?.locationId) {
+              const locations = await api.getLocations();
+              const match = locations.find((l: Location) => l.id === proj.locationId);
+              if (match) setLocationName(match.name);
+            }
+
             api.trackCampaignEvent(camp.id, 'page_view').catch(console.error);
           }
         } catch (err) {
@@ -58,6 +81,13 @@ export default function CampaignLandingPage() {
     );
   }
 
+  const heroImage = campaign.featuredImage || project?.coverImage;
+  const propertyDetails = [
+    locationName && { icon: MapPin, label: 'Location', value: locationName },
+    project && project.startingPrice > 0 && { icon: Wallet, label: 'Starting Price', value: `₦${project.startingPrice.toLocaleString()}` },
+    project && project.availableUnits > 0 && { icon: LayoutGrid, label: 'Available Units', value: String(project.availableUnits) },
+  ].filter(Boolean) as { icon: typeof MapPin; label: string; value: string }[];
+
   return (
     <div className="bg-white min-h-screen">
       {/* Campaign Hero */}
@@ -70,25 +100,32 @@ export default function CampaignLandingPage() {
             <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
               {campaign.name}
             </h1>
-            <p className="text-lg text-gray-200 mb-8 leading-relaxed">
-              {campaign.description || "Don't miss out on our limited-time premium property offers tailored specifically for you. Secure your investment today with flexible payment plans."}
+            <p className="text-lg text-gray-200 mb-8 leading-relaxed whitespace-pre-line">
+              {campaign.description || project?.description || ''}
             </p>
-            <ul className="space-y-4 mb-8">
-              <li className="flex items-center gap-3"><CheckCircle className="text-green-400 w-5 h-5" /> <span>Prime Location with High ROI</span></li>
-              <li className="flex items-center gap-3"><CheckCircle className="text-green-400 w-5 h-5" /> <span>Verified Documents & Titles</span></li>
-              <li className="flex items-center gap-3"><CheckCircle className="text-green-400 w-5 h-5" /> <span>Flexible Installment Options</span></li>
-            </ul>
+            {propertyDetails.length > 0 && (
+              <ul className="space-y-4 mb-8">
+                {propertyDetails.map(({ icon: Icon, label, value }) => (
+                  <li key={label} className="flex items-center gap-3">
+                    <Icon className="text-green-400 w-5 h-5 flex-shrink-0" />
+                    <span><span className="text-gray-300">{label}:</span> <strong>{value}</strong></span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <div className="md:w-1/2 w-full relative h-[400px]">
-            <Image 
-              src={campaign.featuredImage || "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"} 
-              alt={campaign.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              loading="lazy"
-              className="rounded-3xl shadow-2xl object-cover"
-            />
-          </div>
+          {heroImage && (
+            <div className="md:w-1/2 w-full relative h-[400px]">
+              <Image
+                src={heroImage}
+                alt={campaign.name}
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                loading="lazy"
+                className="rounded-3xl shadow-2xl object-cover"
+              />
+            </div>
+          )}
         </div>
       </section>
 
@@ -100,27 +137,43 @@ export default function CampaignLandingPage() {
             <div className="w-24 h-1 bg-[var(--color-primary)] mx-auto mb-6"></div>
             <p className="text-xl text-gray-600">Use our Qualification Wizard to get tailored recommendations and speak with our consultants.</p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="sticky top-24">
               <CampaignWizard campaign={campaign} questions={questions} />
             </div>
-            <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100">
-              <h3 className="text-2xl font-bold mb-6">Why Invest Now?</h3>
-              <div className="space-y-8">
-                <div>
-                  <h4 className="font-bold text-lg mb-2 text-[var(--color-primary)]">Strategic Location</h4>
-                  <p className="text-gray-600">Situated in rapid development zones ensuring capital appreciation within the first 12 months.</p>
+
+            <div className="space-y-8">
+              {/* Media Gallery — driven by campaign_media, admin-configured */}
+              {media.length > 0 && (
+                <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+                  <h3 className="text-2xl font-bold mb-6">Gallery</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {media.map(m => (
+                      <div key={m.id} className="relative h-40 rounded-xl overflow-hidden bg-gray-100">
+                        <Image src={m.fileUrl} alt={m.title || campaign.name} fill sizes="200px" className="object-cover" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-lg mb-2 text-[var(--color-primary)]">Secure Investment</h4>
-                  <p className="text-gray-600">All properties come with verified C of O and are free from all government encumbrances.</p>
+              )}
+
+              {/* FAQs — driven by campaign_faqs, admin-approved */}
+              {faqs.length > 0 && (
+                <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100">
+                  <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                    <HelpCircle className="w-6 h-6 text-[var(--color-primary)]" /> Frequently Asked Questions
+                  </h3>
+                  <div className="space-y-6">
+                    {faqs.map(f => (
+                      <div key={f.id}>
+                        <h4 className="font-bold text-lg mb-2 text-[var(--color-primary)]">{f.question}</h4>
+                        <p className="text-gray-600">{f.answer}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-lg mb-2 text-[var(--color-primary)]">Easy Entry</h4>
-                  <p className="text-gray-600">Start with as little as 20% down payment and spread the balance comfortably.</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
