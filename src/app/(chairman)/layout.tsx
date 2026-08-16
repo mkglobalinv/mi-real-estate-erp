@@ -117,6 +117,15 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               Campaign Manager
             </Link>
 
+            {/* PORTFOLIO */}
+            <div className="pt-6 pb-1 px-4">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Portfolio</p>
+            </div>
+            <Link href="/chairman/projects" onClick={closeMenu} className={linkClass('/chairman/projects')}>
+              <FolderGit2 className={iconClass('/chairman/projects')} />
+              Estate Projects
+            </Link>
+
             {/* OVERSIGHT */}
             <div className="pt-6 pb-1 px-4">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Executive Oversight</p>
