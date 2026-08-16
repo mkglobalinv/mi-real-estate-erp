@@ -84,7 +84,14 @@ export async function POST(request: NextRequest) {
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt }
       ],
-      response_format: { type: 'json_object' }
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'campaign_draft',
+          schema: DRAFT_SCHEMA,
+          strict: true
+        }
+      }
     });
 
     const responseContent = response.choices[0]?.message?.content;
