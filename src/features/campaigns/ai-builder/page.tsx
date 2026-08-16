@@ -48,36 +48,47 @@ export default function CampaignAiBuilderPage({ basePath = '/admin' }: { basePat
         slug = `${slug}-${Date.now().toString().slice(-5)}`;
       }
 
-      const campaign = await api.saveCampaign({
-        name: config.name,
-        slug,
-        description: config.description,
-        status: 'Draft',
-        greetingEnabled: config.greetingEnabled,
-        preApplicationEnabled: config.preApplicationEnabled,
-        preApplicationPrompt: config.preApplicationPrompt || undefined
-      });
+      let campaign;
+      try {
+        campaign = await api.saveCampaign({
+          name: config.name,
+          slug,
+          description: config.description,
+          status: 'Draft',
+          greetingEnabled: config.greetingEnabled,
+          preApplicationEnabled: config.preApplicationEnabled,
+          preApplicationPrompt: config.preApplicationPrompt || undefined
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'unknown error';
+        throw new Error(`Failed to create campaign: ${msg}`);
+      }
 
       const keyToId = new Map<string, string>();
-      for (const q of config.questions || []) {
-        const saved = await api.saveCampaignQuestion({
-          campaignId: campaign.id,
-          type: q.type,
-          questionText: q.questionText,
-          options: q.options || undefined,
-          isRequired: q.isRequired,
-          questionKey: q.questionKey || undefined
-        });
-        if (q.questionKey) keyToId.set(q.questionKey, saved.id);
-      }
-      for (const q of config.questions || []) {
-        if (q.questionKey && q.parentQuestionKey && keyToId.has(q.parentQuestionKey)) {
-          const childId = keyToId.get(q.questionKey);
-          const parentId = keyToId.get(q.parentQuestionKey);
-          if (childId && parentId) {
-            await api.saveCampaignQuestion({ id: childId, parentQuestionId: parentId, showIfOption: q.showIfOption || null });
+      try {
+        for (const q of config.questions || []) {
+          const saved = await api.saveCampaignQuestion({
+            campaignId: campaign.id,
+            type: q.type,
+            questionText: q.questionText,
+            options: q.options || undefined,
+            isRequired: q.isRequired,
+            questionKey: q.questionKey || undefined
+          });
+          if (q.questionKey) keyToId.set(q.questionKey, saved.id);
+        }
+        for (const q of config.questions || []) {
+          if (q.questionKey && q.parentQuestionKey && keyToId.has(q.parentQuestionKey)) {
+            const childId = keyToId.get(q.questionKey);
+            const parentId = keyToId.get(q.parentQuestionKey);
+            if (childId && parentId) {
+              await api.saveCampaignQuestion({ id: childId, parentQuestionId: parentId, showIfOption: q.showIfOption || null });
+            }
           }
         }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'unknown error';
+        throw new Error(`Campaign "${campaign.name}" was created, but saving its questions failed: ${msg}`);
       }
 
       toast.success('Campaign created as a Draft — review and activate it when ready');
