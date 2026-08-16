@@ -35,8 +35,8 @@ export default function PortalDashboard() {
             if (alloc) {
               setAllocation(alloc);
               if (alloc.project_id) {
-                const { data: proj } = await supabase.from('projects').select('*').eq('id', alloc.project_id).single();
-                if (proj) setProject(proj);
+                const { data: proj } = await supabase.from('projects').select('*, locations(name)').eq('id', alloc.project_id).single();
+                if (proj) setProject({ ...proj, location: proj.locations?.name || proj.location });
               }
             }
 
