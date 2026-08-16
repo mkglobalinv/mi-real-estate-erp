@@ -519,3 +519,54 @@ ALTER TABLE public.campaign_questions
 -- Paused -> active=false, Archived -> archived=true (active is forced false).
 ALTER TABLE public.projects
   ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false;
+
+-- 29. PRODUCTION HOTFIX
+-- (a) `projects` has Row Level Security enabled in production with no
+--     policies attached, so every insert/update from the app fails with
+--     "new row violates row-level security policy". This app enforces
+--     write authorization at the application layer (role-gated routes in
+--     src/utils/supabase/middleware.ts) rather than per-table Postgres
+--     RLS — no other table in this schema has RLS policies either — so
+--     these policies restore that same posture instead of inventing a new
+--     one: public read access (the public site lists projects), write
+--     access for any logged-in Supabase Auth session. No DELETE policy is
+--     added; projects are archived, never hard-deleted (see
+--     api.updateProjectArchiveStatus).
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "projects_select_all" ON public.projects;
+CREATE POLICY "projects_select_all" ON public.projects
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "projects_insert_authenticated" ON public.projects;
+CREATE POLICY "projects_insert_authenticated" ON public.projects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "projects_update_authenticated" ON public.projects;
+CREATE POLICY "projects_update_authenticated" ON public.projects
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- (b) `campaign_ai_drafts` is defined above (section 26.6) but that
+--     migration was never run against production, so PostgREST returns
+--     "Could not find the table 'public.campaign_ai_drafts' in the schema
+--     cache". Re-asserting the identical, idempotent definition here
+--     creates it in production without any effect on an environment where
+--     it already exists.
+CREATE TABLE IF NOT EXISTS public.campaign_ai_drafts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL,
+    prompt_text TEXT NOT NULL,
+    generated_config JSONB NOT NULL,
+    status TEXT DEFAULT 'Pending Review' CHECK (status IN ('Pending Review', 'Approved', 'Rejected')),
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
