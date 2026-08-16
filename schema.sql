@@ -676,3 +676,45 @@ CREATE POLICY "locations_select_all" ON public.locations
   FOR SELECT
   TO anon, authenticated
   USING (true);
+
+-- 32. PRODUCTION HOTFIX
+-- campaigns has RLS enabled in production with no policies attached.
+-- This is the one remaining unprotected step in the AI draft approval
+-- chain (campaign_ai_drafts -> campaigns -> campaign_questions ->
+-- campaign_ai_drafts update/link): with campaign_ai_drafts,
+-- campaign_questions and locations already fixed (sections 30-31),
+-- approveCampaignAiDraft (src/lib/api.ts) now reaches its saveCampaign
+-- INSERT and fails there with "new row violates row-level security
+-- policy for table campaigns" — reproduced locally by running the exact
+-- statements from that function against RLS-enabled campaigns with no
+-- policy. Adds the same policy shape as every other table fixed in this
+-- chain: public SELECT (the public landing page reads a campaign by
+-- slug, see src/app/(public)/c/[slug]/page.tsx and
+-- api.getCampaignBySlug), authenticated INSERT/UPDATE/DELETE (Campaign
+-- Manager CRUD + AI approval).
+ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "campaigns_select_all" ON public.campaigns;
+CREATE POLICY "campaigns_select_all" ON public.campaigns
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "campaigns_insert_authenticated" ON public.campaigns;
+CREATE POLICY "campaigns_insert_authenticated" ON public.campaigns
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaigns_update_authenticated" ON public.campaigns;
+CREATE POLICY "campaigns_update_authenticated" ON public.campaigns
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaigns_delete_authenticated" ON public.campaigns;
+CREATE POLICY "campaigns_delete_authenticated" ON public.campaigns
+  FOR DELETE
+  TO authenticated
+  USING (true);
