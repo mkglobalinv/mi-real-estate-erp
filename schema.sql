@@ -614,3 +614,65 @@ CREATE POLICY "campaign_ai_drafts_update_authenticated" ON public.campaign_ai_dr
 INSERT INTO public.locations (name, status)
 VALUES ('Tofa, Kano State', 'Active')
 ON CONFLICT (name) DO NOTHING;
+
+-- 31. PRODUCTION HOTFIX
+-- (a) campaign_questions has RLS enabled in production with no policies
+--     attached. This is invisible during normal campaign creation because
+--     CampaignForm.tsx seeds default questions in a swallowed .catch()
+--     (see src/components/admin/CampaignForm.tsx), but it is NOT
+--     swallowed in the AI draft approval path (api.approveCampaignAiDraft
+--     in src/lib/api.ts awaits saveCampaignQuestion directly for each
+--     question), so approval fails there with "new row violates row
+--     level security policy for table campaign_questions" — surfaced to
+--     the user as the generic "Failed to approve draft" (the thrown
+--     Supabase error is a plain object, not an Error instance, so the
+--     UI's `error instanceof Error` check falls through to that generic
+--     message). Adds the same policy shape as campaign_ai_drafts/projects:
+--     public SELECT (the public landing page reads questions to render
+--     the qualification flow, see src/app/(public)/c/[slug]/page.tsx),
+--     authenticated INSERT/UPDATE/DELETE (Admin question management +
+--     AI approval), matching this schema's existing RLS posture.
+ALTER TABLE public.campaign_questions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "campaign_questions_select_all" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_select_all" ON public.campaign_questions
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "campaign_questions_insert_authenticated" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_insert_authenticated" ON public.campaign_questions
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaign_questions_update_authenticated" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_update_authenticated" ON public.campaign_questions
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaign_questions_delete_authenticated" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_delete_authenticated" ON public.campaign_questions
+  FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- (b) The New Project Location dropdown was still empty after the Tofa,
+--     Kano State row was seeded (PR #8) because public.locations also has
+--     RLS enabled in production with no SELECT policy — Postgres RLS
+--     silently filters out all rows for a SELECT with no matching policy
+--     rather than raising an error, so api.getLocations() (a plain
+--     unfiltered select, already confirmed correct) just returned an
+--     empty array. Adds a public read policy only, matching how the
+--     dropdown is used; no write policy is added since location writes
+--     (src/features/locations/page.tsx) are not part of the reported
+--     issue.
+ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "locations_select_all" ON public.locations;
+CREATE POLICY "locations_select_all" ON public.locations
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
