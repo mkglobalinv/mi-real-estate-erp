@@ -177,7 +177,7 @@ export default function AllocationsPage({ basePath = '/admin', params: routePara
                   <select required className="w-full border-gray-200 rounded-xl px-4 py-3 focus:ring-[var(--color-primary)] bg-gray-50"
                     value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
                     <option value="">Select an Estate...</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {projects.filter(p => !p.archived).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">

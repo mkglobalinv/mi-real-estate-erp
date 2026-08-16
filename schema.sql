@@ -511,3 +511,168 @@ ALTER TABLE public.campaign_questions
   ADD COLUMN IF NOT EXISTS question_text_hausa TEXT,
   ADD COLUMN IF NOT EXISTS options_hausa JSONB,
   ADD COLUMN IF NOT EXISTS options_scores JSONB;
+
+-- 28. PROJECT MANAGEMENT: ARCHIVE STATUS
+-- Projects are never hard-deleted because campaigns/reservations/allocations
+-- reference them via project_id. `archived` is a soft-removal flag on top of
+-- the existing `active` (Active/Paused) toggle: Active -> active=true,
+-- Paused -> active=false, Archived -> archived=true (active is forced false).
+ALTER TABLE public.projects
+  ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false;
+
+-- 29. PRODUCTION HOTFIX
+-- (a) `projects` has Row Level Security enabled in production with no
+--     policies attached, so every insert/update from the app fails with
+--     "new row violates row-level security policy". This app enforces
+--     write authorization at the application layer (role-gated routes in
+--     src/utils/supabase/middleware.ts) rather than per-table Postgres
+--     RLS — no other table in this schema has RLS policies either — so
+--     these policies restore that same posture instead of inventing a new
+--     one: public read access (the public site lists projects), write
+--     access for any logged-in Supabase Auth session. No DELETE policy is
+--     added; projects are archived, never hard-deleted (see
+--     api.updateProjectArchiveStatus).
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "projects_select_all" ON public.projects;
+CREATE POLICY "projects_select_all" ON public.projects
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "projects_insert_authenticated" ON public.projects;
+CREATE POLICY "projects_insert_authenticated" ON public.projects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "projects_update_authenticated" ON public.projects;
+CREATE POLICY "projects_update_authenticated" ON public.projects
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- (b) `campaign_ai_drafts` is defined above (section 26.6) but that
+--     migration was never run against production, so PostgREST returns
+--     "Could not find the table 'public.campaign_ai_drafts' in the schema
+--     cache". Re-asserting the identical, idempotent definition here
+--     creates it in production without any effect on an environment where
+--     it already exists.
+CREATE TABLE IF NOT EXISTS public.campaign_ai_drafts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL,
+    prompt_text TEXT NOT NULL,
+    generated_config JSONB NOT NULL,
+    status TEXT DEFAULT 'Pending Review' CHECK (status IN ('Pending Review', 'Approved', 'Rejected')),
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 30. PRODUCTION HOTFIX
+-- (a) campaign_ai_drafts has RLS enabled in production with no policies
+--     attached, so every insert (AI Builder generation, see
+--     src/app/api/admin/campaigns/ai-draft/route.ts) and update
+--     (approve/reject, see api.approveCampaignAiDraft /
+--     api.rejectCampaignAiDraft in src/lib/api.ts) fails with "new row
+--     violates row-level security policy". Authorization is already
+--     enforced at the application layer (that route checks profiles.role
+--     is Chairman/Social Media Director/Super Admin before inserting),
+--     matching this schema's existing RLS posture (see section 29), so
+--     these policies simply allow any logged-in Supabase Auth session to
+--     read/write. No DELETE policy — nothing in the app deletes AI drafts.
+ALTER TABLE public.campaign_ai_drafts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "campaign_ai_drafts_select_authenticated" ON public.campaign_ai_drafts;
+CREATE POLICY "campaign_ai_drafts_select_authenticated" ON public.campaign_ai_drafts
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "campaign_ai_drafts_insert_authenticated" ON public.campaign_ai_drafts;
+CREATE POLICY "campaign_ai_drafts_insert_authenticated" ON public.campaign_ai_drafts
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaign_ai_drafts_update_authenticated" ON public.campaign_ai_drafts;
+CREATE POLICY "campaign_ai_drafts_update_authenticated" ON public.campaign_ai_drafts
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- (b) The New Project page's Location dropdown (api.getLocations()) was
+--     empty because public.locations has never been seeded with any
+--     rows. Adds the one location this business currently needs, using
+--     the table's existing free-text "State / City Name" convention (see
+--     src/features/locations/page.tsx) rather than hard-coding it into
+--     the Project form. ON CONFLICT guards against a duplicate insert on
+--     re-run (name has a UNIQUE constraint).
+INSERT INTO public.locations (name, status)
+VALUES ('Tofa, Kano State', 'Active')
+ON CONFLICT (name) DO NOTHING;
+
+-- 31. PRODUCTION HOTFIX
+-- (a) campaign_questions has RLS enabled in production with no policies
+--     attached. This is invisible during normal campaign creation because
+--     CampaignForm.tsx seeds default questions in a swallowed .catch()
+--     (see src/components/admin/CampaignForm.tsx), but it is NOT
+--     swallowed in the AI draft approval path (api.approveCampaignAiDraft
+--     in src/lib/api.ts awaits saveCampaignQuestion directly for each
+--     question), so approval fails there with "new row violates row
+--     level security policy for table campaign_questions" — surfaced to
+--     the user as the generic "Failed to approve draft" (the thrown
+--     Supabase error is a plain object, not an Error instance, so the
+--     UI's `error instanceof Error` check falls through to that generic
+--     message). Adds the same policy shape as campaign_ai_drafts/projects:
+--     public SELECT (the public landing page reads questions to render
+--     the qualification flow, see src/app/(public)/c/[slug]/page.tsx),
+--     authenticated INSERT/UPDATE/DELETE (Admin question management +
+--     AI approval), matching this schema's existing RLS posture.
+ALTER TABLE public.campaign_questions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "campaign_questions_select_all" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_select_all" ON public.campaign_questions
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "campaign_questions_insert_authenticated" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_insert_authenticated" ON public.campaign_questions
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaign_questions_update_authenticated" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_update_authenticated" ON public.campaign_questions
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaign_questions_delete_authenticated" ON public.campaign_questions;
+CREATE POLICY "campaign_questions_delete_authenticated" ON public.campaign_questions
+  FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- (b) The New Project Location dropdown was still empty after the Tofa,
+--     Kano State row was seeded (PR #8) because public.locations also has
+--     RLS enabled in production with no SELECT policy — Postgres RLS
+--     silently filters out all rows for a SELECT with no matching policy
+--     rather than raising an error, so api.getLocations() (a plain
+--     unfiltered select, already confirmed correct) just returned an
+--     empty array. Adds a public read policy only, matching how the
+--     dropdown is used; no write policy is added since location writes
+--     (src/features/locations/page.tsx) are not part of the reported
+--     issue.
+ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "locations_select_all" ON public.locations;
+CREATE POLICY "locations_select_all" ON public.locations
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);

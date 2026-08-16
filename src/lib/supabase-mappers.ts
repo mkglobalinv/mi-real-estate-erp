@@ -54,8 +54,26 @@ export function mapDbToProject(db: any): Project {
     availableUnits: Number(db.available_units),
     coverImage: db.cover_image,
     locationId: db.location_id,
+    location: db.locations?.name || db.location,
     easyBuyStatus: db.easy_buy_status,
+    active: db.active,
+    archived: db.archived ?? false,
     createdAt: db.created_at
+  };
+}
+
+export function mapProjectToDb(proj: Partial<Project>): any {
+  return {
+    ...(proj.id && { id: proj.id }),
+    ...(proj.name !== undefined && { name: proj.name }),
+    ...(proj.description !== undefined && { description: proj.description }),
+    ...(proj.locationId !== undefined && { location_id: proj.locationId || null }),
+    ...(proj.coverImage !== undefined && { cover_image: proj.coverImage }),
+    ...(proj.availableUnits !== undefined && { available_units: proj.availableUnits }),
+    ...(proj.startingPrice !== undefined && { starting_price: proj.startingPrice }),
+    ...(proj.easyBuyStatus !== undefined && { easy_buy_status: proj.easyBuyStatus }),
+    ...(proj.active !== undefined && { active: proj.active }),
+    ...(proj.archived !== undefined && { archived: proj.archived })
   };
 }
 

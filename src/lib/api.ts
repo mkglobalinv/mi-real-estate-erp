@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
 import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
@@ -37,20 +37,29 @@ export const api = {
 
   // --- PROJECTS ---
   async getProjects(): Promise<Project[]> {
-    const { data, error } = await getSupabase().from('projects').select('*');
+    const { data, error } = await getSupabase().from('projects').select('*, locations(name)').order('created_at', { ascending: false });
     if (error) throw new Error(`Supabase error: ${error.message}`);
     if (data) return data.map(mapDbToProject);
     return [];
   },
 
   async saveProject(proj: Partial<Project>): Promise<Project> {
-    const { data, error } = await getSupabase().from('projects').upsert(proj).select().single();
+    if (!proj.name || !proj.name.trim()) throw new Error('Project name is required');
+    if (!proj.description || !proj.description.trim()) throw new Error('Project description is required');
+    if (proj.availableUnits === undefined || isNaN(Number(proj.availableUnits)) || Number(proj.availableUnits) < 0) {
+      throw new Error('Available units must be a valid non-negative number');
+    }
+    if (proj.startingPrice === undefined || isNaN(Number(proj.startingPrice)) || Number(proj.startingPrice) < 0) {
+      throw new Error('Starting price must be a valid non-negative number');
+    }
+    const mapped = mapProjectToDb(proj);
+    const { data, error } = await getSupabase().from('projects').upsert(mapped).select('*, locations(name)').single();
     if (error) throw new Error(`Supabase error: ${error.message}`);
     return mapDbToProject(data);
   },
 
   async getProjectById(id: string): Promise<Project | null> {
-    const { data, error } = await getSupabase().from('projects').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await getSupabase().from('projects').select('*, locations(name)').eq('id', id).maybeSingle();
     if (error || !data) return null;
     return mapDbToProject(data);
   },
@@ -1280,7 +1289,23 @@ export const api = {
       .from('projects')
       .update({ active })
       .eq('id', id)
-      .select()
+      .select('*, locations(name)')
+      .single();
+    if (error) throw new Error(error.message);
+    return mapDbToProject(data);
+  },
+
+  // --- PROJECTS: ARCHIVE / RESTORE ---
+  // Projects are never hard-deleted since campaigns, reservations and
+  // allocations reference them via project_id. Archiving soft-removes a
+  // project from active use (public site, campaign/project selectors)
+  // while preserving the row and its references.
+  async updateProjectArchiveStatus(id: string, archived: boolean): Promise<Project> {
+    const { data, error } = await getSupabase()
+      .from('projects')
+      .update(archived ? { archived: true, active: false } : { archived: false })
+      .eq('id', id)
+      .select('*, locations(name)')
       .single();
     if (error) throw new Error(error.message);
     return mapDbToProject(data);
