@@ -87,7 +87,7 @@ export default function PortalDashboard() {
   const progressPercent = account && account.totalPropertyPrice > 0 ? Math.round((totalPaid / account.totalPropertyPrice) * 100) : 0;
 
   const isChairmanApproved = customer?.status === 'Active' || customer?.status === 'Chairman Approved';
-  const isAllocated = allocation?.status === 'Allocated';
+  const isAllocated = !!allocation?.plot_number;
   
   const pendingInstallments = installments.filter(i => i.status !== 'Paid');
   const nextInstallment = pendingInstallments.length > 0 ? pendingInstallments[0] : null;
@@ -142,7 +142,7 @@ export default function PortalDashboard() {
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Allocation</p>
             <p className="text-lg font-extrabold text-gray-900 mb-1">
-              {allocation?.status || 'Not Allocated'}
+              {isAllocated ? 'Allocated' : 'Pending Allocation'}
             </p>
             <p className="text-xs text-gray-500 font-medium">
               {isAllocated ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending allocation criteria.'}
@@ -281,7 +281,7 @@ export default function PortalDashboard() {
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase">Property Allocation</p>
                   <p className="font-bold text-gray-900">
-                    {allocation?.status === 'Allocated' ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending Allocation'}
+                    {isAllocated ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending Allocation'}
                   </p>
                 </div>
               </div>
