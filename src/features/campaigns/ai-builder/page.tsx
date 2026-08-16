@@ -3,11 +3,30 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { CampaignQuestion } from '@/lib/types';
 import { toast } from 'react-hot-toast';
 import { Sparkles, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 const EXAMPLE_PROMPT = "Create a landing page for Sabuwar Abuja Residential Plots Extension. Show the property information, available plot sizes and payment information. Ask the customer their name, location, preferred plot size, purpose of buying, payment preference and when they want to buy. Ask them if they are ready to buy once or start instalment. If they agree to fill the form before coming to our office, send them the official application form. If they do not want the form, take them to WhatsApp.";
+
+interface DraftConfig {
+  name: string;
+  suggestedSlug: string;
+  description?: string;
+  greetingEnabled?: boolean;
+  preApplicationEnabled?: boolean;
+  preApplicationPrompt?: string | null;
+  questions: Array<{
+    questionKey?: string | null;
+    type: CampaignQuestion['type'];
+    questionText: string;
+    options?: string[] | null;
+    isRequired: boolean;
+    parentQuestionKey?: string | null;
+    showIfOption?: string | null;
+  }>;
+}
 
 export default function CampaignAiBuilderPage({ basePath = '/admin' }: { basePath?: string, params?: any }) {
   const router = useRouter();
@@ -22,7 +41,45 @@ export default function CampaignAiBuilderPage({ basePath = '/admin' }: { basePat
     setGenerating(true);
     try {
       const draft = await api.generateCampaignAiDraft(prompt.trim());
-      const campaign = await api.approveCampaignAiDraft(draft.id);
+      const config = draft.generatedConfig as unknown as DraftConfig;
+
+      let slug = (config.suggestedSlug || config.name || 'campaign').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      if (await api.getCampaignBySlug(slug)) {
+        slug = `${slug}-${Date.now().toString().slice(-5)}`;
+      }
+
+      const campaign = await api.saveCampaign({
+        name: config.name,
+        slug,
+        description: config.description,
+        status: 'Draft',
+        greetingEnabled: config.greetingEnabled,
+        preApplicationEnabled: config.preApplicationEnabled,
+        preApplicationPrompt: config.preApplicationPrompt || undefined
+      });
+
+      const keyToId = new Map<string, string>();
+      for (const q of config.questions || []) {
+        const saved = await api.saveCampaignQuestion({
+          campaignId: campaign.id,
+          type: q.type,
+          questionText: q.questionText,
+          options: q.options || undefined,
+          isRequired: q.isRequired,
+          questionKey: q.questionKey || undefined
+        });
+        if (q.questionKey) keyToId.set(q.questionKey, saved.id);
+      }
+      for (const q of config.questions || []) {
+        if (q.questionKey && q.parentQuestionKey && keyToId.has(q.parentQuestionKey)) {
+          const childId = keyToId.get(q.questionKey);
+          const parentId = keyToId.get(q.parentQuestionKey);
+          if (childId && parentId) {
+            await api.saveCampaignQuestion({ id: childId, parentQuestionId: parentId, showIfOption: q.showIfOption || null });
+          }
+        }
+      }
+
       toast.success('Campaign created as a Draft — review and activate it when ready');
       router.push(`${basePath}/campaigns/${campaign.id}/edit`);
     } catch (error) {
