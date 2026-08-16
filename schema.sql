@@ -570,3 +570,47 @@ CREATE TABLE IF NOT EXISTS public.campaign_ai_drafts (
     reviewed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 30. PRODUCTION HOTFIX
+-- (a) campaign_ai_drafts has RLS enabled in production with no policies
+--     attached, so every insert (AI Builder generation, see
+--     src/app/api/admin/campaigns/ai-draft/route.ts) and update
+--     (approve/reject, see api.approveCampaignAiDraft /
+--     api.rejectCampaignAiDraft in src/lib/api.ts) fails with "new row
+--     violates row-level security policy". Authorization is already
+--     enforced at the application layer (that route checks profiles.role
+--     is Chairman/Social Media Director/Super Admin before inserting),
+--     matching this schema's existing RLS posture (see section 29), so
+--     these policies simply allow any logged-in Supabase Auth session to
+--     read/write. No DELETE policy — nothing in the app deletes AI drafts.
+ALTER TABLE public.campaign_ai_drafts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "campaign_ai_drafts_select_authenticated" ON public.campaign_ai_drafts;
+CREATE POLICY "campaign_ai_drafts_select_authenticated" ON public.campaign_ai_drafts
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "campaign_ai_drafts_insert_authenticated" ON public.campaign_ai_drafts;
+CREATE POLICY "campaign_ai_drafts_insert_authenticated" ON public.campaign_ai_drafts
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "campaign_ai_drafts_update_authenticated" ON public.campaign_ai_drafts;
+CREATE POLICY "campaign_ai_drafts_update_authenticated" ON public.campaign_ai_drafts
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- (b) The New Project page's Location dropdown (api.getLocations()) was
+--     empty because public.locations has never been seeded with any
+--     rows. Adds the one location this business currently needs, using
+--     the table's existing free-text "State / City Name" convention (see
+--     src/features/locations/page.tsx) rather than hard-coding it into
+--     the Project form. ON CONFLICT guards against a duplicate insert on
+--     re-run (name has a UNIQUE constraint).
+INSERT INTO public.locations (name, status)
+VALUES ('Tofa, Kano State', 'Active')
+ON CONFLICT (name) DO NOTHING;
