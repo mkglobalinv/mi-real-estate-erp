@@ -29,3 +29,7 @@ export const generateEasyBuyRef = (count: number): string => {
 export const generateTicketRef = (count: number): string => {
   return `TKT-${new Date().getFullYear()}-${count.toString().padStart(4, '0')}`;
 };
+
+export const generateAllocationRef = (count: number): string => {
+  return `ALLOC-${new Date().getFullYear()}-${count.toString().padStart(4, '0')}`;
+};

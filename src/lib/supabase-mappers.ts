@@ -310,6 +310,7 @@ export function mapDbToAllocation(db: any): Allocation {
 export function mapAllocationToDb(alloc: Partial<Allocation>): any {
   return {
     ...(alloc.id && { id: alloc.id }),
+    ...(alloc.ref && { ref: alloc.ref }),
     ...(alloc.customerId && { customer_id: alloc.customerId }),
     ...(alloc.projectId && { project_id: alloc.projectId }),
     ...(alloc.blockNumber && { block_number: alloc.blockNumber }),
