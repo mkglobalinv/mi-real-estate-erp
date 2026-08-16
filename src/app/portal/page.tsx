@@ -8,13 +8,16 @@ import {
 import Link from 'next/link';
 
 import { createClient } from '@/utils/supabase/client';
-import { Customer, Application, Allocation } from '@/lib/types';
+import { Customer, Application, Allocation, EasyBuyAccount, Installment, Project } from '@/lib/types';
 
 export default function PortalDashboard() {
   const [mounted, setMounted] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [application, setApplication] = useState<Application | null>(null);
   const [allocation, setAllocation] = useState<Allocation | null>(null);
+  const [account, setAccount] = useState<EasyBuyAccount | null>(null);
+  const [installments, setInstallments] = useState<Installment[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
 
   useEffect(() => {
     async function loadUserData() {
@@ -29,7 +32,38 @@ export default function PortalDashboard() {
             if (app) setApplication(app);
 
             const { data: alloc } = await supabase.from('allocations').select('*').eq('customer_id', cust.id).order('created_at', { ascending: false }).limit(1).single();
-            if (alloc) setAllocation(alloc);
+            if (alloc) {
+              setAllocation(alloc);
+              if (alloc.project_id) {
+                const { data: proj } = await supabase.from('projects').select('*').eq('id', alloc.project_id).single();
+                if (proj) setProject(proj);
+              }
+            }
+
+            const { data: acc } = await supabase.from('easy_buy_accounts').select('*').eq('customer_id', cust.id).order('created_at', { ascending: false }).limit(1).single();
+            if (acc) {
+              // Convert keys back
+              const mappedAcc = {
+                id: acc.id,
+                totalPropertyPrice: Number(acc.total_amount),
+                initialDeposit: Number(acc.initial_deposit),
+                amountPaid: Number(acc.amount_paid || acc.initial_deposit), // Assume at least deposit is paid
+                outstandingBalance: Number(acc.outstanding_balance),
+                monthlyInstallment: Number(acc.monthly_installment)
+              } as EasyBuyAccount;
+              setAccount(mappedAcc);
+
+              const { data: insts } = await supabase.from('installments').select('*').eq('account_id', acc.id).order('month_number', { ascending: true });
+              if (insts) {
+                setInstallments(insts.map(i => ({
+                  ...i,
+                  installmentNumber: i.month_number,
+                  dueDate: i.due_date,
+                  amountDue: Number(i.amount),
+                  status: i.status
+                } as Installment)));
+              }
+            }
           }
         }
       } catch (e) {
@@ -43,11 +77,16 @@ export default function PortalDashboard() {
 
   if (!mounted) return null;
 
-  // Real data for the UI prototype
-  const progressPercent = 0; // Requires Ledger Integration to calculate properly
-  const isChairmanApproved = customer?.status === 'Active';
-  const isAllocated = !!allocation;
-  const isPaymentUpToDate = true; // Requires Ledger integration
+  const totalPaid = account ? account.initialDeposit + (installments.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.amountDue, 0)) : 0;
+  const outstanding = account ? account.totalPropertyPrice - totalPaid : 0;
+  const progressPercent = account && account.totalPropertyPrice > 0 ? Math.round((totalPaid / account.totalPropertyPrice) * 100) : 0;
+
+  const isChairmanApproved = customer?.status === 'Active' || customer?.status === 'Chairman Approved';
+  const isAllocated = allocation?.status === 'Allocated';
+  
+  const pendingInstallments = installments.filter(i => i.status !== 'Paid');
+  const nextInstallment = pendingInstallments.length > 0 ? pendingInstallments[0] : null;
+  const isPaymentUpToDate = !nextInstallment || new Date(nextInstallment.dueDate) >= new Date();
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto pb-24">
@@ -57,9 +96,9 @@ export default function PortalDashboard() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold mb-2 tracking-tight">Welcome back, {customer?.full_name || 'Customer'}!</h1>
+            <h1 className="text-3xl md:text-4xl font-extrabold mb-2 tracking-tight">Welcome back, {customer?.fullName || customer?.full_name || 'Customer'}!</h1>
             <p className="text-green-50 font-medium max-w-lg opacity-90">
-              Your Easy Buy investment is progressing smoothly. You are currently on track to complete your payments by December 2026.
+              Your Easy Buy investment is progressing smoothly. You are currently on track with your payments.
             </p>
           </div>
           <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl shrink-0 text-center min-w-[140px]">
@@ -84,9 +123,9 @@ export default function PortalDashboard() {
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Registration</p>
             <p className="text-lg font-extrabold text-gray-900 mb-1">
-              {isChairmanApproved ? 'Chairman Approved' : application?.status || 'Pending Review'}
+              {isChairmanApproved ? 'Active' : application?.status || 'Pending Review'}
             </p>
-            <p className="text-xs text-gray-500 font-medium">Your Easy Buy account is {isChairmanApproved ? 'fully active' : 'under review'}.</p>
+            <p className="text-xs text-gray-500 font-medium">Your account is {isChairmanApproved ? 'fully active' : 'under review'}.</p>
           </div>
         </div>
 
@@ -98,10 +137,10 @@ export default function PortalDashboard() {
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Allocation</p>
             <p className="text-lg font-extrabold text-gray-900 mb-1">
-              {isAllocated ? allocation?.status || 'Allocated' : 'Not Allocated'}
+              {allocation?.status || 'Not Allocated'}
             </p>
             <p className="text-xs text-gray-500 font-medium">
-              {isAllocated ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending completion criteria.'}
+              {isAllocated ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending allocation criteria.'}
             </p>
           </div>
         </div>
@@ -116,7 +155,9 @@ export default function PortalDashboard() {
             <p className="text-lg font-extrabold text-gray-900 mb-1">
               {isPaymentUpToDate ? 'Up To Date' : 'Overdue'}
             </p>
-            <p className="text-xs text-gray-500 font-medium">Next payment due: 15th Nov 2026</p>
+            <p className="text-xs text-gray-500 font-medium">
+              {nextInstallment ? `Next payment due: ${new Date(nextInstallment.dueDate).toLocaleDateString()}` : 'All payments completed'}
+            </p>
           </div>
         </div>
       </div>
@@ -140,15 +181,15 @@ export default function PortalDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Total Property Value</p>
-                  <p className="text-2xl font-extrabold text-gray-900">₦5,000,000</p>
+                  <p className="text-2xl font-extrabold text-gray-900">₦{account?.totalPropertyPrice.toLocaleString() || '0'}</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-green-50 border border-green-100">
                   <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-1">Total Paid</p>
-                  <p className="text-2xl font-extrabold text-green-700">₦3,250,000</p>
+                  <p className="text-2xl font-extrabold text-green-700">₦{totalPaid.toLocaleString()}</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100">
                   <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outstanding Balance</p>
-                  <p className="text-2xl font-extrabold text-amber-700">₦1,750,000</p>
+                  <p className="text-2xl font-extrabold text-amber-700">₦{outstanding.toLocaleString()}</p>
                 </div>
               </div>
 
@@ -208,11 +249,17 @@ export default function PortalDashboard() {
             </h3>
             <div className="bg-white/10 rounded-2xl p-4 border border-white/10 relative z-10">
               <p className="text-xs uppercase tracking-wide font-bold text-amber-400 mb-1">Upcoming Installment</p>
-              <p className="text-2xl font-extrabold mb-1">₦187,500</p>
-              <p className="text-sm text-gray-300 mb-4">Due on 15th Nov, 2026</p>
-              <Link href="/portal/payments" className="block w-full py-2.5 bg-white text-gray-900 text-center rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors">
-                Submit Payment Proof
-              </Link>
+              {nextInstallment ? (
+                <>
+                  <p className="text-2xl font-extrabold mb-1">₦{nextInstallment.amountDue.toLocaleString()}</p>
+                  <p className="text-sm text-gray-300 mb-4">Due on {new Date(nextInstallment.dueDate).toLocaleDateString()}</p>
+                  <Link href="/portal/payments" className="block w-full py-2.5 bg-white text-gray-900 text-center rounded-xl font-bold text-sm hover:bg-gray-100 transition-colors">
+                    Submit Payment Proof
+                  </Link>
+                </>
+              ) : (
+                <p className="text-sm text-gray-300">No pending installments.</p>
+              )}
             </div>
           </div>
 
@@ -222,19 +269,27 @@ export default function PortalDashboard() {
               <div className="flex justify-between items-end border-b border-gray-50 pb-3">
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase">Estate Project</p>
-                  <p className="font-bold text-gray-900">Yarimawa Easy Buy Estate</p>
+                  <p className="font-bold text-gray-900">{project?.name || 'TBD'}</p>
                 </div>
               </div>
               <div className="flex justify-between items-end border-b border-gray-50 pb-3">
                 <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Property Type</p>
-                  <p className="font-bold text-gray-900">Plot of Land (50ft by 100ft)</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase">Property Allocation</p>
+                  <p className="font-bold text-gray-900">
+                    {allocation?.status === 'Allocated' ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending Allocation'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-between items-end border-b border-gray-50 pb-3">
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase">Location</p>
+                  <p className="font-bold text-gray-900">{project?.location || 'TBD'}</p>
                 </div>
               </div>
               <div className="flex justify-between items-end pb-1">
                 <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Location</p>
-                  <p className="font-bold text-gray-900">Yarimawa, Kano</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase">Next of Kin</p>
+                  <p className="font-bold text-gray-900">{customer?.nok_name || customer?.nextOfKinName || 'N/A'} - {customer?.nok_phone || customer?.nextOfKinPhone || 'N/A'}</p>
                 </div>
               </div>
             </div>

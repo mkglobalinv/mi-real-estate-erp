@@ -2,23 +2,36 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { Customer } from '@/lib/types';
-import { Users, Search, Filter, ChevronRight, CheckCircle2, Clock, PlusCircle, X } from 'lucide-react';
+import { Customer, Project } from '@/lib/types';
+import { Users, Search, ChevronRight, CheckCircle2, Clock, PlusCircle, X, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 
 export default function CustomersPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [successData, setSuccessData] = useState<{name: string, username: string, tempPass: string} | null>(null);
+  const [copied, setCopied] = useState(false);
+
   const [formData, setFormData] = useState({
-    fullName: '', email: '', phone: '', address: '', occupation: '', nokName: '', nokPhone: '', nokRelation: ''
+    // Section A
+    fullName: '', phone: '', email: '', idSerial: '', address: '',
+    // Section B
+    projectId: '', plotSize: '', plotNumber: '', totalAmount: 0,
+    // Section C
+    initialDeposit: 0, installmentPeriod: 12, installmentStartDate: '',
+    // Section D
+    nokName: '', nokPhone: '', nokRelation: ''
   });
 
   useEffect(() => {
     loadData();
+    api.getProjects().then(setProjects);
   }, []);
 
   const loadData = async () => {
@@ -26,41 +39,139 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
     setCustomers(custs);
   };
 
+  const calculateInstallments = () => {
+    const amount = formData.totalAmount - formData.initialDeposit;
+    if (amount <= 0 || formData.installmentPeriod <= 0) return 0;
+    return Math.floor(amount / formData.installmentPeriod);
+  };
+
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    
     try {
+      const emailToUse = formData.email || `customer-${Date.now()}@mirealestate.portal`;
+      
+      // 1. Create Portal Account via API
+      const authRes = await fetch('/api/admin/create-customer-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToUse, fullName: formData.fullName, phone: formData.phone })
+      });
+      const authData = await authRes.json();
+      
+      if (!authRes.ok) {
+        throw new Error(authData.error || 'Failed to create auth account');
+      }
+
+      // 2. Save Customer Record
+      const fullAddress = formData.idSerial ? `[ID: ${formData.idSerial}] ${formData.address}` : formData.address;
       const newCustomer = await api.saveCustomer({
         fullName: formData.fullName,
-        email: formData.email,
+        email: emailToUse,
         phone: formData.phone,
-        address: formData.address,
-        occupation: formData.occupation,
+        address: fullAddress,
         nextOfKinName: formData.nokName,
         nextOfKinPhone: formData.nokPhone,
         nextOfKinRelationship: formData.nokRelation,
-        status: 'Pending Review'
+        status: 'Active'
       });
       
-      // Auto-generate application
+      // 3. Auto-generate application
       await api.saveApplication({
         customerId: newCustomer.id,
-        status: 'Pending Review',
-        documentsVerified: false
+        status: 'Chairman Approved',
+        documentsVerified: true
+      });
+
+      // 4. Create Easy Buy Account
+      const monthlyInst = calculateInstallments();
+      const endDate = new Date(formData.installmentStartDate);
+      endDate.setMonth(endDate.getMonth() + formData.installmentPeriod);
+      
+      // We omit propertyId as it is optional in DB and only project is known.
+      const ebAccount = await api.saveEasyBuyAccount({
+        customerId: newCustomer.id,
+        projectId: formData.projectId,
+        totalPropertyPrice: formData.totalAmount,
+        initialDeposit: formData.initialDeposit,
+        monthlyInstallment: monthlyInst,
+        durationMonths: formData.installmentPeriod,
+        startDate: formData.installmentStartDate,
+        endDate: endDate.toISOString().split('T')[0],
+        outstandingBalance: formData.totalAmount - formData.initialDeposit,
+        status: 'Active'
+      });
+
+      // 5. Generate Installment Schedule Records
+      let currentDate = new Date(formData.installmentStartDate);
+      let remainingBalance = formData.totalAmount - formData.initialDeposit;
+      
+      for (let i = 1; i <= formData.installmentPeriod; i++) {
+        // Last installment takes the remainder
+        const currentInstAmount = (i === formData.installmentPeriod) ? remainingBalance : monthlyInst;
+        
+        await api.saveInstallment({
+          accountId: ebAccount.id,
+          installmentNumber: i,
+          amountDue: currentInstAmount,
+          dueDate: currentDate.toISOString().split('T')[0],
+          status: 'Pending'
+        });
+        
+        remainingBalance -= currentInstAmount;
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      
+      // 6. Allocation Prep (if Plot Number provided)
+      if (formData.plotNumber) {
+        await api.saveAllocation({
+          customerId: newCustomer.id,
+          projectId: formData.projectId,
+          blockNumber: 'TBD',
+          plotNumber: formData.plotNumber,
+          status: 'Pending Allocation'
+        });
+      }
+
+      setSuccessData({
+        name: formData.fullName,
+        username: emailToUse,
+        tempPass: authData.tempPassword
       });
       
-      toast.success('Customer registered & Application created! (Pending Review)');
-      setIsFormOpen(false);
-      setFormData({ fullName: '', email: '', phone: '', address: '', occupation: '', nokName: '', nokPhone: '', nokRelation: '' });
+      toast.success('Customer and Portal Account created successfully!');
       loadData();
     } catch (error: any) {
       toast.error(error.message || 'Failed to register customer');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const copyCredentials = () => {
+    if (!successData) return;
+    const text = `Customer Portal Credentials\nURL: https://mirealestate.com/login\nUsername: ${successData.username}\nPassword: ${successData.tempPass}`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setSuccessData(null);
+    setFormData({
+      fullName: '', phone: '', email: '', idSerial: '', address: '',
+      projectId: '', plotSize: '', plotNumber: '', totalAmount: 0,
+      initialDeposit: 0, installmentPeriod: 12, installmentStartDate: '',
+      nokName: '', nokPhone: '', nokRelation: ''
+    });
   };
 
   const filteredCustomers = customers.filter(c => {
     const matchesSearch = searchTerm === '' || 
       c.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      c.ref.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.ref?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.phone.includes(searchTerm);
     const matchesStatus = statusFilter === '' || c.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -77,7 +188,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
           <p className="text-gray-500 font-medium mt-1">Master list of all registered customers across operations.</p>
         </div>
         <button onClick={() => setIsFormOpen(true)} className="btn-primary flex items-center gap-2 px-4 py-2 font-bold shadow-sm">
-          <PlusCircle className="w-5 h-5" /> Register Customer
+          <PlusCircle className="w-5 h-5" /> Create New Customer
         </button>
       </div>
 
@@ -162,71 +273,170 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
 
       {isFormOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
-          <div className="w-full max-w-lg bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+          <div className="w-full max-w-2xl bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <div>
-                <h2 className="text-xl font-extrabold text-gray-900">Register Customer</h2>
-                <p className="text-sm text-gray-500">Create a new customer profile.</p>
+                <h2 className="text-xl font-extrabold text-gray-900">Create New Customer</h2>
+                <p className="text-sm text-gray-500">Provision CRM record and portal access.</p>
               </div>
-              <button onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500"><X className="w-5 h-5"/></button>
+              <button onClick={closeForm} className="p-2 hover:bg-gray-200 rounded-full text-gray-500"><X className="w-5 h-5"/></button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6">
-              <form id="custForm" onSubmit={handleCreateCustomer} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Full Name *</label>
-                  <input required type="text" className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                    value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Phone *</label>
-                    <input required type="text" className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                      value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
+              {successData ? (
+                <div className="text-center py-10">
+                  <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-green-200">
+                    <CheckCircle2 className="w-10 h-10" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
-                    <input type="email" className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                      value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                  <h3 className="text-2xl font-extrabold text-gray-900 mb-2">CUSTOMER PORTAL CREATED SUCCESSFULLY</h3>
+                  <p className="text-gray-600 mb-8 font-medium">Portal access has been provisioned for <br/><strong className="text-gray-900">{successData.name}</strong></p>
+                  
+                  <div className="bg-gray-900 text-white p-6 rounded-2xl max-w-sm mx-auto text-left shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                    <div className="relative z-10">
+                      <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Username</p>
+                      <p className="font-mono text-lg mb-4 select-all">{successData.username}</p>
+                      
+                      <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Temporary Password</p>
+                      <p className="font-mono text-lg text-[var(--color-gold)] select-all">{successData.tempPass}</p>
+                    </div>
                   </div>
+                  
+                  <button onClick={copyCredentials} className="mt-6 btn-primary flex items-center gap-2 mx-auto px-6 py-3 shadow-md">
+                    {copied ? <><Check className="w-5 h-5"/> Copied!</> : <><Copy className="w-5 h-5"/> COPY LOGIN DETAILS</>}
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Address</label>
-                  <textarea rows={2} className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                    value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Occupation</label>
-                  <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                    value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} />
-                </div>
-                
-                <h3 className="font-bold text-gray-900 border-b pb-1 mt-6">Next of Kin Details</h3>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Name</label>
-                  <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                    value={formData.nokName} onChange={e => setFormData({...formData, nokName: e.target.value})} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Phone</label>
-                    <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                      value={formData.nokPhone} onChange={e => setFormData({...formData, nokPhone: e.target.value})} />
+              ) : (
+                <form id="custForm" onSubmit={handleCreateCustomer} className="space-y-8">
+                  {/* SECTION A */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-3 mb-4 text-[var(--color-primary)]">Section A: Customer Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Customer Full Name *</label>
+                        <input required type="text" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white transition-colors"
+                          value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Phone Number *</label>
+                        <input required type="text" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Email Address</label>
+                        <input type="email" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">ID / Serial Number *</label>
+                        <input required type="text" placeholder="e.g. SARPE/00" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.idSerial} onChange={e => setFormData({...formData, idSerial: e.target.value})} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Residential Address</label>
+                        <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Relationship</label>
-                    <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2 bg-gray-50"
-                      value={formData.nokRelation} onChange={e => setFormData({...formData, nokRelation: e.target.value})} />
+
+                  {/* SECTION B */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-3 mb-4 text-[var(--color-primary)]">Section B: Property Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Project / Estate *</label>
+                        <select required className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
+                          <option value="">Select a project...</option>
+                          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Plot Size *</label>
+                        <input required type="text" placeholder="e.g. 50x100" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.plotSize} onChange={e => setFormData({...formData, plotSize: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Plot Number</label>
+                        <input type="text" placeholder="Pending Allocation if empty" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.plotNumber} onChange={e => setFormData({...formData, plotNumber: e.target.value})} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Total Plot Amount (₦) *</label>
+                        <input required type="number" min="0" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white font-bold text-lg text-gray-900"
+                          value={formData.totalAmount || ''} onChange={e => setFormData({...formData, totalAmount: Number(e.target.value)})} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </form>
+
+                  {/* SECTION C */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-3 mb-4 text-[var(--color-primary)]">Section C: Payment & Installment</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Initial Deposit Amount (₦) *</label>
+                        <input required type="number" min="0" max={formData.totalAmount} className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white font-bold"
+                          value={formData.initialDeposit || ''} onChange={e => setFormData({...formData, initialDeposit: Number(e.target.value)})} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Installment Period (Months) *</label>
+                        <input required type="number" min="1" max="120" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.installmentPeriod || ''} onChange={e => setFormData({...formData, installmentPeriod: Number(e.target.value)})} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Installment Start Date *</label>
+                        <input required type="date" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.installmentStartDate} onChange={e => setFormData({...formData, installmentStartDate: e.target.value})} />
+                      </div>
+                    </div>
+                    {/* Auto Calculated Summary */}
+                    {formData.totalAmount > 0 && formData.installmentPeriod > 0 && (
+                      <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center">
+                        <div>
+                          <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Calculated Monthly Payment</p>
+                          <p className="text-xl font-extrabold text-blue-800">₦{calculateInstallments().toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Outstanding</p>
+                          <p className="text-lg font-bold text-blue-800">₦{(formData.totalAmount - formData.initialDeposit).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SECTION D */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-3 mb-4 text-[var(--color-primary)]">Section D: Next of Kin</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Full Name</label>
+                        <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.nokName} onChange={e => setFormData({...formData, nokName: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Phone Number</label>
+                        <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.nokPhone} onChange={e => setFormData({...formData, nokPhone: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">Relationship</label>
+                        <input type="text" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={formData.nokRelation} onChange={e => setFormData({...formData, nokRelation: e.target.value})} />
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              )}
             </div>
             
-            <div className="p-6 border-t border-gray-100 bg-white">
-              <button form="custForm" type="submit" className="w-full btn-primary py-4 text-base shadow-lg shadow-green-200">
-                Register Customer
-              </button>
-            </div>
+            {!successData && (
+              <div className="p-6 border-t border-gray-100 bg-white shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                <button disabled={isLoading} form="custForm" type="submit" className="w-full btn-primary py-4 text-base font-bold shadow-lg shadow-green-200 flex items-center justify-center gap-2 transition-all">
+                  {isLoading ? <Clock className="w-5 h-5 animate-spin" /> : 'CREATE CUSTOMER PORTAL'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
