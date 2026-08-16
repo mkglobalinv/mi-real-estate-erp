@@ -137,16 +137,17 @@ export const api = {
     }
   },
 
-  async saveCustomer(customer: Partial<Customer>): Promise<Customer> {
+  async saveCustomer(customer: Partial<Customer>, client?: any): Promise<Customer> {
     try {
+      const supabase = client || getSupabase();
       if (!customer.id && !customer.ref) {
-        const { count, error: countErr } = await getSupabase().from('customers').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await supabase.from('customers').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         customer.ref = generateCustomerRef((count || 0) + 1);
       }
       
       const mapped = mapCustomerToDb(customer);
-      const { data, error } = await getSupabase().from('customers').upsert(mapped).select().single();
+      const { data, error } = await supabase.from('customers').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToCustomer(data);
     } catch (err) {
@@ -168,16 +169,17 @@ export const api = {
     }
   },
 
-  async saveEasyBuyAccount(account: Partial<EasyBuyAccount>): Promise<EasyBuyAccount> {
+  async saveEasyBuyAccount(account: Partial<EasyBuyAccount>, client?: any): Promise<EasyBuyAccount> {
     try {
+      const supabase = client || getSupabase();
       if (!account.id && !account.ref) {
-        const { count, error: countErr } = await getSupabase().from('easy_buy_accounts').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await supabase.from('easy_buy_accounts').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         account.ref = generateEasyBuyRef((count || 0) + 1);
       }
 
       const mapped = mapEasyBuyAccountToDb(account);
-      const { data, error } = await getSupabase().from('easy_buy_accounts').upsert(mapped).select().single();
+      const { data, error } = await supabase.from('easy_buy_accounts').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToEasyBuyAccount(data);
     } catch (err) {
@@ -199,16 +201,17 @@ export const api = {
     }
   },
 
-  async saveApplication(app: Partial<Application>): Promise<Application> {
+  async saveApplication(app: Partial<Application>, client?: any): Promise<Application> {
     try {
+      const supabase = client || getSupabase();
       if (!app.id && !app.ref) {
-        const { count, error: countErr } = await getSupabase().from('applications').select('*', { count: 'exact', head: true });
+        const { count, error: countErr } = await supabase.from('applications').select('*', { count: 'exact', head: true });
         if (countErr) throw new Error(countErr.message);
         app.ref = `APP-2026-${String((count || 0) + 1).padStart(4, '0')}`;
       }
 
       const mapped = mapApplicationToDb(app);
-      const { data, error } = await getSupabase().from('applications').upsert(mapped).select().single();
+      const { data, error } = await supabase.from('applications').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToApplication(data);
     } catch (err) {
@@ -230,10 +233,11 @@ export const api = {
     }
   },
 
-  async saveInstallment(installment: Partial<Installment>): Promise<Installment> {
+  async saveInstallment(installment: Partial<Installment>, client?: any): Promise<Installment> {
     try {
+      const supabase = client || getSupabase();
       const mapped = mapInstallmentToDb(installment);
-      const { data, error } = await getSupabase().from('installments').upsert(mapped).select().single();
+      const { data, error } = await supabase.from('installments').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToInstallment(data);
     } catch (err) {

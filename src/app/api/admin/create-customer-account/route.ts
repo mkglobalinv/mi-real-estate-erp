@@ -26,9 +26,11 @@ function generatePassword(length = 8) {
   return password;
 }
 
+import { api } from '@/lib/api';
+
 export async function POST(request: Request) {
   try {
-    const { email, fullName, phone } = await request.json();
+    const { email, fullName, phone, formData } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required for portal account.' }, { status: 400 });
@@ -51,6 +53,77 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Failed to create auth user:', error);
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (formData) {
+      // 2. Save Customer Record
+      const fullAddress = formData.idSerial ? `[ID: ${formData.idSerial}] ${formData.address}` : formData.address;
+      const newCustomer = await api.saveCustomer({
+        userId: data.user.id,
+        fullName: formData.fullName,
+        email: email,
+        phone: formData.phone,
+        address: fullAddress,
+        status: 'Active',
+        nokName: formData.nokName,
+        nokPhone: formData.nokPhone,
+        nokRelation: formData.nokRelation
+      }, supabaseAdmin);
+
+      // 3. Auto-generate application
+      await api.saveApplication({
+        customerId: newCustomer.id,
+        status: 'Chairman Approved',
+        documentsVerified: true
+      }, supabaseAdmin);
+
+      // 4. Create Easy Buy Account
+      const monthlyInst = formData.monthlyInst || 0; // Passed from client
+      const endDate = new Date(formData.installmentStartDate);
+      endDate.setMonth(endDate.getMonth() + formData.installmentPeriod);
+      
+      const ebAccount = await api.saveEasyBuyAccount({
+        customerId: newCustomer.id,
+        projectId: formData.projectId,
+        totalPropertyPrice: formData.totalAmount,
+        initialDeposit: formData.initialDeposit,
+        monthlyInstallment: monthlyInst,
+        durationMonths: formData.installmentPeriod,
+        startDate: formData.installmentStartDate,
+        endDate: endDate.toISOString().split('T')[0],
+        outstandingBalance: formData.totalAmount - formData.initialDeposit,
+        status: 'Active'
+      }, supabaseAdmin);
+
+      // 5. Generate Installment Schedule Records
+      let currentDate = new Date(formData.installmentStartDate);
+      let remainingBalance = formData.totalAmount - formData.initialDeposit;
+      
+      for (let i = 1; i <= formData.installmentPeriod; i++) {
+        const currentInstAmount = (i === formData.installmentPeriod) ? remainingBalance : monthlyInst;
+        
+        await api.saveInstallment({
+          accountId: ebAccount.id,
+          installmentNumber: i,
+          amountDue: currentInstAmount,
+          dueDate: currentDate.toISOString().split('T')[0],
+          status: 'Pending'
+        }, supabaseAdmin);
+        
+        remainingBalance -= currentInstAmount;
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      
+      // 6. Allocation Prep (if Plot Number provided)
+      if (formData.plotNumber) {
+        await api.saveAllocation({
+          customerId: newCustomer.id,
+          projectId: formData.projectId,
+          blockNumber: 'TBD',
+          plotNumber: formData.plotNumber,
+          status: 'Pending Allocation'
+        }, supabaseAdmin);
+      }
     }
 
     return NextResponse.json({

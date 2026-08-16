@@ -52,86 +52,24 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
     try {
       const emailToUse = formData.email || `customer-${Date.now()}@mirealestate.portal`;
       
-      // 1. Create Portal Account via API
+      // 1. Create Portal Account & Save to Database via API
       const authRes = await fetch('/api/admin/create-customer-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailToUse, fullName: formData.fullName, phone: formData.phone })
+        body: JSON.stringify({ 
+          email: emailToUse, 
+          fullName: formData.fullName, 
+          phone: formData.phone,
+          formData: {
+            ...formData,
+            monthlyInst: calculateInstallments()
+          }
+        })
       });
       const authData = await authRes.json();
       
       if (!authRes.ok) {
-        throw new Error(authData.error || 'Failed to create auth account');
-      }
-
-      // 2. Save Customer Record
-      const fullAddress = formData.idSerial ? `[ID: ${formData.idSerial}] ${formData.address}` : formData.address;
-      const newCustomer = await api.saveCustomer({
-        fullName: formData.fullName,
-        email: emailToUse,
-        phone: formData.phone,
-        address: fullAddress,
-        nextOfKinName: formData.nokName,
-        nextOfKinPhone: formData.nokPhone,
-        nextOfKinRelationship: formData.nokRelation,
-        status: 'Active'
-      });
-      
-      // 3. Auto-generate application
-      await api.saveApplication({
-        customerId: newCustomer.id,
-        status: 'Chairman Approved',
-        documentsVerified: true
-      });
-
-      // 4. Create Easy Buy Account
-      const monthlyInst = calculateInstallments();
-      const endDate = new Date(formData.installmentStartDate);
-      endDate.setMonth(endDate.getMonth() + formData.installmentPeriod);
-      
-      // We omit propertyId as it is optional in DB and only project is known.
-      const ebAccount = await api.saveEasyBuyAccount({
-        customerId: newCustomer.id,
-        projectId: formData.projectId,
-        totalPropertyPrice: formData.totalAmount,
-        initialDeposit: formData.initialDeposit,
-        monthlyInstallment: monthlyInst,
-        durationMonths: formData.installmentPeriod,
-        startDate: formData.installmentStartDate,
-        endDate: endDate.toISOString().split('T')[0],
-        outstandingBalance: formData.totalAmount - formData.initialDeposit,
-        status: 'Active'
-      });
-
-      // 5. Generate Installment Schedule Records
-      let currentDate = new Date(formData.installmentStartDate);
-      let remainingBalance = formData.totalAmount - formData.initialDeposit;
-      
-      for (let i = 1; i <= formData.installmentPeriod; i++) {
-        // Last installment takes the remainder
-        const currentInstAmount = (i === formData.installmentPeriod) ? remainingBalance : monthlyInst;
-        
-        await api.saveInstallment({
-          accountId: ebAccount.id,
-          installmentNumber: i,
-          amountDue: currentInstAmount,
-          dueDate: currentDate.toISOString().split('T')[0],
-          status: 'Pending'
-        });
-        
-        remainingBalance -= currentInstAmount;
-        currentDate.setMonth(currentDate.getMonth() + 1);
-      }
-      
-      // 6. Allocation Prep (if Plot Number provided)
-      if (formData.plotNumber) {
-        await api.saveAllocation({
-          customerId: newCustomer.id,
-          projectId: formData.projectId,
-          blockNumber: 'TBD',
-          plotNumber: formData.plotNumber,
-          status: 'Pending Allocation'
-        });
+        throw new Error(authData.error || 'Failed to create customer and account');
       }
 
       setSuccessData({
