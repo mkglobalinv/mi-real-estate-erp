@@ -141,7 +141,7 @@ export function mapDbToEasyBuyAccount(db: any): EasyBuyAccount {
     ...db,
     customerId: db.customer_id,
     propertyId: db.property_id,
-    projectId: db.project_id, // If project_id exists in your future migrations, otherwise ignore
+    projectId: db.project_id,
     totalPropertyPrice: Number(db.total_amount),
     initialDeposit: Number(db.initial_deposit),
     monthlyInstallment: Number(db.monthly_installment),
@@ -159,6 +159,7 @@ export function mapEasyBuyAccountToDb(acc: Partial<EasyBuyAccount>): any {
     ...(acc.ref && { ref: acc.ref }),
     ...(acc.customerId && { customer_id: acc.customerId }),
     ...(acc.propertyId && { property_id: acc.propertyId }),
+    ...(acc.projectId && { project_id: acc.projectId }),
     ...(acc.totalPropertyPrice !== undefined && { total_amount: acc.totalPropertyPrice }),
     ...(acc.initialDeposit !== undefined && { initial_deposit: acc.initialDeposit }),
     ...(acc.monthlyInstallment !== undefined && { monthly_installment: acc.monthlyInstallment }),
