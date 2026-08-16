@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { MapPin, Wallet, LayoutGrid, HelpCircle } from 'lucide-react';
+import { MapPin, Wallet, LayoutGrid, HelpCircle, Building2 } from 'lucide-react';
 import CampaignWizard from '@/components/CampaignWizard';
 import Image from 'next/image';
 import { api } from '@/lib/api';
@@ -71,13 +71,17 @@ export default function CampaignLandingPage() {
   }, [slug]);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#ECE5DD]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--color-primary)]"></div>
+      </div>
+    );
   }
 
   if (!campaign) {
     return (
-      <div className="min-h-screen flex items-center justify-center flex-col gap-4">
-        <h2 className="text-2xl font-bold">Campaign Not Found</h2>
+      <div className="min-h-screen flex items-center justify-center flex-col gap-4 bg-[#ECE5DD] px-6 text-center">
+        <h2 className="text-2xl font-bold text-gray-800">Campaign Not Found</h2>
         <button onClick={() => router.push('/')} className="btn-primary">Return Home</button>
       </div>
     );
@@ -91,129 +95,152 @@ export default function CampaignLandingPage() {
   ].filter(Boolean) as { icon: typeof MapPin; label: string; value: string }[];
 
   return (
-    <div className="bg-white min-h-screen">
-      {/* Campaign Hero */}
-      <section className="bg-[var(--color-primary-dark)] text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-12">
-          <div className="md:w-1/2">
-            <div className="inline-block bg-[var(--color-accent)] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-6">
-              Exclusive Offer
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-              {campaign.name}
-            </h1>
-            <p className="text-lg text-gray-200 mb-8 leading-relaxed whitespace-pre-line">
-              {campaign.description || project?.description || ''}
-            </p>
-            {propertyDetails.length > 0 && (
-              <ul className="space-y-4 mb-8">
-                {propertyDetails.map(({ icon: Icon, label, value }) => (
-                  <li key={label} className="flex items-center gap-3">
-                    <Icon className="text-green-400 w-5 h-5 flex-shrink-0" />
-                    <span><span className="text-gray-300">{label}:</span> <strong>{value}</strong></span>
-                  </li>
-                ))}
-              </ul>
+    <div className="min-h-screen bg-[#ECE5DD] sm:py-6">
+      {/* Phone-width chat panel — mobile-first; on larger screens it stays
+          narrow like a chat window instead of stretching into a website layout. */}
+      <div className="max-w-md mx-auto min-h-screen sm:min-h-0 flex flex-col bg-[#ECE5DD] sm:rounded-2xl sm:shadow-xl overflow-hidden">
+
+        {/* WhatsApp-style top bar */}
+        <header className="bg-[var(--color-primary-dark)] text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0 overflow-hidden">
+            {heroImage ? (
+              <Image src={heroImage} alt="" width={40} height={40} className="w-full h-full object-cover" />
+            ) : (
+              <Building2 className="w-5 h-5 text-white" />
             )}
           </div>
-          {heroImage && (
-            <div className="md:w-1/2 w-full relative h-[400px]">
-              <Image
-                src={heroImage}
-                alt={campaign.name}
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                loading="lazy"
-                className="rounded-3xl shadow-2xl object-cover"
-              />
+          <div className="min-w-0">
+            <p className="font-bold text-sm truncate">M.I. Real Estate</p>
+            <p className="text-[11px] text-green-100/90">Property Consultant</p>
+          </div>
+        </header>
+
+        {/* Chat body */}
+        <div className="flex-1 flex flex-col gap-3 px-3 py-4">
+
+          {/* Campaign / property introduction, presented as the first chat message */}
+          <div className="flex items-end gap-2">
+            <div className="w-7 h-7 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center flex-shrink-0 mb-1">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm overflow-hidden max-w-[calc(100%-2.25rem)] w-full">
+              {heroImage && (
+                <div className="relative w-full h-44">
+                  <Image
+                    src={heroImage}
+                    alt={campaign.name}
+                    fill
+                    sizes="400px"
+                    className="object-cover"
+                  />
+                </div>
+              )}
+              <div className="px-4 py-4">
+                <div className="inline-block bg-[var(--color-accent)] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider mb-2">
+                  Exclusive Offer
+                </div>
+                <h1 className="text-lg font-bold text-gray-800 leading-snug mb-1.5">
+                  {campaign.name}
+                </h1>
+                {(campaign.description || project?.description) && (
+                  <p className="text-[15px] text-gray-600 leading-relaxed whitespace-pre-line mb-3">
+                    {campaign.description || project?.description || ''}
+                  </p>
+                )}
+                {propertyDetails.length > 0 && (
+                  <ul className="space-y-2 pt-1 border-t border-gray-100">
+                    {propertyDetails.map(({ icon: Icon, label, value }) => (
+                      <li key={label} className="flex items-center gap-2 text-sm pt-2">
+                        <Icon className="text-[var(--color-primary)] w-4 h-4 flex-shrink-0" />
+                        <span className="text-gray-500">{label}:</span> <strong className="text-gray-800">{value}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Media Gallery — driven by campaign_media, admin-configured */}
+          {media.length > 0 && (
+            <div className="flex items-end gap-2">
+              <div className="w-7 flex-shrink-0" />
+              <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm p-3 max-w-[calc(100%-2.25rem)] w-full">
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {media.map(m => (
+                    <div key={m.id} className="relative h-28 w-28 flex-shrink-0 rounded-xl overflow-hidden bg-gray-100">
+                      <Image src={m.fileUrl} alt={m.title || campaign.name} fill sizes="112px" className="object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
-        </div>
-      </section>
 
-      {/* Property Information & Advisor */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Interested in {campaign.name}?</h2>
-            <div className="w-24 h-1 bg-[var(--color-primary)] mx-auto mb-6"></div>
-            <p className="text-xl text-gray-600">Use our Qualification Wizard to get tailored recommendations and speak with our consultants.</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-12 items-start">
-            <div className="sticky top-24">
-              <CampaignWizard campaign={campaign} questions={questions} />
+          {/* Packages */}
+          {packages.length > 0 && (
+            <div className="flex items-end gap-2">
+              <div className="w-7 flex-shrink-0" />
+              <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm px-4 py-4 max-w-[calc(100%-2.25rem)] w-full">
+                <h3 className="text-sm font-bold mb-3 flex items-center gap-1.5 text-gray-800">
+                  <Wallet className="w-4 h-4 text-[var(--color-primary)]" /> Packages & Pricing
+                </h3>
+                <div className="space-y-3">
+                  {packages.map(pkg => (
+                    <div key={pkg.id} className="border-t border-gray-100 pt-3 first:border-0 first:pt-0">
+                      <p className="font-bold text-[15px] mb-1.5 text-gray-800">{pkg.name}</p>
+                      <div className="text-sm text-gray-600 grid grid-cols-2 gap-1.5">
+                        <div><span className="text-gray-400">Outright:</span> ₦{pkg.outrightPrice.toLocaleString()}</div>
+                        <div><span className="text-gray-400">Deposit:</span> ₦{pkg.initialDeposit.toLocaleString()}</div>
+                        {pkg.durationMonths > 0 && (
+                          <>
+                            <div><span className="text-gray-400">Monthly:</span> ₦{pkg.monthlyInstallment.toLocaleString()}</div>
+                            <div><span className="text-gray-400">Duration:</span> {pkg.durationMonths} Months</div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
+          )}
 
-            <div className="space-y-8">
-              {/* Media Gallery — driven by campaign_media, admin-configured */}
-              {media.length > 0 && (
-                <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
-                  <h3 className="text-2xl font-bold mb-6">Gallery</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {media.map(m => (
-                      <div key={m.id} className="relative h-40 rounded-xl overflow-hidden bg-gray-100">
-                        <Image src={m.fileUrl} alt={m.title || campaign.name} fill sizes="200px" className="object-cover" />
-                      </div>
-                    ))}
-                  </div>
+          {/* FAQs — driven by campaign_faqs, admin-approved */}
+          {faqs.length > 0 && (
+            <div className="flex items-end gap-2">
+              <div className="w-7 flex-shrink-0" />
+              <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm px-4 py-4 max-w-[calc(100%-2.25rem)] w-full">
+                <h3 className="text-sm font-bold mb-3 flex items-center gap-1.5 text-gray-800">
+                  <HelpCircle className="w-4 h-4 text-[var(--color-primary)]" /> Frequently Asked Questions
+                </h3>
+                <div className="space-y-3">
+                  {faqs.map(f => (
+                    <div key={f.id} className="border-t border-gray-100 pt-3 first:border-0 first:pt-0">
+                      <p className="font-bold text-[15px] mb-1 text-gray-800">{f.question}</p>
+                      <p className="text-sm text-gray-600">{f.answer}</p>
+                    </div>
+                  ))}
                 </div>
-              )}
-
-              {/* FAQs — driven by campaign_faqs, admin-approved */}
-              {faqs.length > 0 && (
-                <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100">
-                  <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                    <HelpCircle className="w-6 h-6 text-[var(--color-primary)]" /> Frequently Asked Questions
-                  </h3>
-                  <div className="space-y-6">
-                    {faqs.map(f => (
-                      <div key={f.id}>
-                        <h4 className="font-bold text-lg mb-2 text-[var(--color-primary)]">{f.question}</h4>
-                        <p className="text-gray-600">{f.answer}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Packages */}
-              {packages.length > 0 && (
-                <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100">
-                  <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                    <Wallet className="w-6 h-6 text-[var(--color-primary)]" /> Packages & Pricing
-                  </h3>
-                  <div className="space-y-6">
-                    {packages.map(pkg => (
-                      <div key={pkg.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                        <h4 className="font-bold text-lg mb-2">{pkg.name}</h4>
-                        <div className="text-sm text-gray-600 grid grid-cols-2 gap-2">
-                          <div><strong>Outright:</strong> ₦{pkg.outrightPrice.toLocaleString()}</div>
-                          <div><strong>Deposit:</strong> ₦{pkg.initialDeposit.toLocaleString()}</div>
-                          {pkg.durationMonths > 0 && (
-                            <>
-                              <div><strong>Monthly:</strong> ₦{pkg.monthlyInstallment.toLocaleString()}</div>
-                              <div><strong>Duration:</strong> {pkg.durationMonths} Months</div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Terms and Conditions */}
-              {campaign.termsAndConditions && (
-                <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100 text-sm text-gray-600">
-                  <h3 className="text-lg font-bold mb-4 text-gray-800">Terms & Conditions</h3>
-                  <div className="whitespace-pre-wrap">{campaign.termsAndConditions}</div>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Terms and Conditions */}
+          {campaign.termsAndConditions && (
+            <div className="flex items-end gap-2">
+              <div className="w-7 flex-shrink-0" />
+              <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm px-4 py-4 max-w-[calc(100%-2.25rem)] w-full text-sm text-gray-600">
+                <p className="text-sm font-bold mb-2 text-gray-800">Terms &amp; Conditions</p>
+                <div className="whitespace-pre-wrap">{campaign.termsAndConditions}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Qualification wizard — one question at a time, unchanged logic */}
+          <CampaignWizard campaign={campaign} questions={questions} />
         </div>
-      </section>
+      </div>
     </div>
   );
 }
