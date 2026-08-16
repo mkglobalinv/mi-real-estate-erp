@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (!profile || !['Social Media Director', 'Super Admin'].includes(profile.role)) {
+    if (!profile || !['Chairman', 'Social Media Director', 'Super Admin'].includes(profile.role)) {
       return NextResponse.json({ error: 'Forbidden: Campaign management access required' }, { status: 403 });
     }
 
@@ -118,6 +118,42 @@ export async function POST(request: NextRequest) {
   } catch (err: unknown) {
     console.error('AI draft generation error:', err);
     const message = err instanceof Error ? err.message : 'Unexpected error generating campaign draft';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (!profile || !['Chairman', 'Social Media Director', 'Super Admin'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Forbidden: Campaign management access required' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const campaignId = searchParams.get('campaignId');
+
+    let query = supabase.from('campaign_ai_drafts').select('*').order('created_at', { ascending: false });
+    if (campaignId) {
+      query = query.eq('campaign_id', campaignId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data || []);
+  } catch (err: unknown) {
+    console.error('AI drafts fetch error:', err);
+    const message = err instanceof Error ? err.message : 'Unexpected error fetching campaign drafts';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

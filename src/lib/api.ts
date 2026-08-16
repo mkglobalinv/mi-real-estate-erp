@@ -809,10 +809,21 @@ export const api = {
 
   // --- CAMPAIGN AI DRAFTS (Landing Page Agent: AI Builder draft -> review -> approve) ---
   async getCampaignAiDrafts(campaignId?: string): Promise<CampaignAiDraft[]> {
-    let query = getSupabase().from('campaign_ai_drafts').select('*').order('created_at', { ascending: false });
-    if (campaignId) query = query.eq('campaign_id', campaignId);
-    const { data, error } = await query;
-    if (error) throw new Error(`Supabase error: ${error.message}`);
+    const url = campaignId 
+      ? `/api/admin/campaigns/ai-draft?campaignId=${encodeURIComponent(campaignId)}`
+      : '/api/admin/campaigns/ai-draft';
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || `HTTP ${response.status}`);
+    }
+    
+    const data = await response.json();
     return data ? data.map(mapDbToCampaignAiDraft) : [];
   },
 
