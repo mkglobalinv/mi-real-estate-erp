@@ -3,12 +3,27 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
-import { ArrowRight, CheckCircle, MessageCircle, User, Globe } from 'lucide-react';
+import { ArrowRight, CheckCircle, MessageCircle, User, Globe, Building2 } from 'lucide-react';
 import { calculateLeadScore } from '@/lib/scoring';
 import { Campaign, CampaignQuestion, ApplicationFormTemplate } from '@/lib/types';
 import { getWizardStrings, getFormalGreeting, SUPPORTED_LANGUAGES, WizardLanguage } from '@/lib/campaignWizardStrings';
 
 type Phase = 'greeting' | 'language' | 'wizard';
+
+// Purely presentational wrapper: gives any step content the look of an
+// incoming chat message (assistant avatar + rounded bubble with a tail).
+function AssistantBubble({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-end gap-2">
+      <div className="w-7 h-7 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center flex-shrink-0 mb-1">
+        <Building2 className="w-4 h-4" />
+      </div>
+      <div className="bg-white rounded-2xl rounded-bl-sm shadow-sm px-4 py-4 sm:px-5 sm:py-5 max-w-[calc(100%-2.25rem)] w-full">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 // Owns its own input state so it naturally resets/restores whenever the
 // enclosing question step remounts (its parent motion.div already changes
@@ -21,14 +36,14 @@ function QuestionTextInput({ question, initialValue, onSubmit, continueLabel }: 
 }) {
   const [value, setValue] = useState(initialValue);
   return (
-    <div className="mb-8">
+    <div>
       {question.type === 'Text Area' ? (
         <textarea
           autoFocus
           value={value}
           onChange={e => setValue(e.target.value)}
-          rows={4}
-          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none text-lg"
+          rows={3}
+          className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none text-base"
         />
       ) : (
         <input
@@ -39,13 +54,13 @@ function QuestionTextInput({ question, initialValue, onSubmit, continueLabel }: 
           onKeyDown={e => {
             if (e.key === 'Enter' && value.trim()) onSubmit(value.trim());
           }}
-          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none text-lg"
+          className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none text-base"
         />
       )}
       <button
         onClick={() => onSubmit(value.trim())}
         disabled={question.isRequired && !value.trim()}
-        className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full mt-3 py-3.5 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] active:scale-[0.98] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
       >
         {continueLabel} <ArrowRight className="w-5 h-5" />
       </button>
@@ -224,101 +239,100 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
   };
 
   const containerVariants = {
-    hidden: { opacity: 0, x: 20 },
-    visible: { opacity: 1, x: 0, transition: { duration: 0.4 } },
-    exit: { opacity: 0, x: -20, transition: { duration: 0.3 } }
+    hidden: { opacity: 0, y: 12 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
+    exit: { opacity: 0, y: -8, transition: { duration: 0.2 } }
   };
 
   return (
-    <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100 min-h-[500px] flex flex-col relative">
-      <div className="bg-[var(--color-primary)] p-6 text-white text-center relative">
-        <h2 className="text-2xl font-bold">{campaign.name} - Qualification</h2>
-        <p className="text-green-100 text-sm mt-1">Let&apos;s find exactly what you need</p>
-        {phase === 'wizard' && (
+    <div className="w-full flex flex-col gap-3">
+      {/* Language toggle — floats above the current bubble, chat-chip style */}
+      {phase === 'wizard' && (
+        <div className="flex justify-end px-1">
           <button
             onClick={() => setPhase('language')}
             title={t.changeLanguage}
-            className="absolute top-4 right-4 flex items-center gap-1 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-2.5 py-1 rounded-full transition-colors"
+            className="flex items-center gap-1 text-xs font-bold bg-white text-[var(--color-primary-dark)] border border-gray-200 px-3 py-1.5 rounded-full shadow-sm hover:bg-gray-50 transition-colors"
           >
             <Globe className="w-3.5 h-3.5" /> {language}
           </button>
+        </div>
+      )}
+
+      <AnimatePresence mode="wait">
+
+        {/* Formal Greeting Step (always shown in the campaign's default language) */}
+        {phase === 'greeting' && (
+          <motion.div key="greeting" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
+            <AssistantBubble>
+              <p className="text-gray-800 text-[15px] leading-relaxed whitespace-pre-line">{getFormalGreeting(campaign)}</p>
+            </AssistantBubble>
+            <button
+              onClick={() => setPhase('language')}
+              className="mt-3 ml-9 w-[calc(100%-2.25rem)] max-w-xs bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] active:scale-[0.98] text-white font-bold py-3.5 rounded-full flex items-center justify-center gap-2 shadow-sm transition-all"
+            >
+              Continue <ArrowRight className="w-5 h-5" />
+            </button>
+          </motion.div>
         )}
-      </div>
 
-      <div className="p-8 flex-grow flex flex-col justify-center">
-        <AnimatePresence mode="wait">
+        {/* Language Selection Step */}
+        {phase === 'language' && (
+          <motion.div key="language" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
+            <AssistantBubble>
+              <p className="text-gray-800 text-[15px] font-medium">Can you continue with English or Hausa?</p>
+            </AssistantBubble>
+            <div className="grid grid-cols-2 gap-2.5 mt-3 ml-9">
+              {SUPPORTED_LANGUAGES.map(lang => (
+                <button
+                  key={lang}
+                  onClick={() => chooseLanguage(lang)}
+                  className="py-3.5 rounded-full border-2 border-[var(--color-primary)] text-center text-[var(--color-primary-dark)] font-bold hover:bg-[var(--color-primary)] hover:text-white active:scale-[0.97] transition-all"
+                >
+                  {lang}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
-          {/* Formal Greeting Step (always shown in the campaign's default language) */}
-          {phase === 'greeting' && (
-            <motion.div key="greeting" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center">
-              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <MessageCircle className="w-10 h-10 text-[var(--color-primary)]" />
-              </div>
-              <p className="text-gray-800 mb-8 text-lg font-medium leading-relaxed">{getFormalGreeting(campaign)}</p>
-              <button onClick={() => setPhase('language')} className="btn-primary w-full max-w-sm mx-auto text-lg py-4 flex items-center justify-center gap-2">
-                Continue <ArrowRight className="w-5 h-5" />
-              </button>
-            </motion.div>
-          )}
+        {/* Welcome Step */}
+        {phase === 'wizard' && currentStep === -1 && (
+          <motion.div key="welcome" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
+            <AssistantBubble>
+              <h3 className="text-lg font-bold text-gray-800 mb-1.5">{t.welcomeHeading}</h3>
+              <p className="text-gray-600 text-[15px] leading-relaxed">{t.welcomeSubtext}</p>
+            </AssistantBubble>
+            <button
+              onClick={() => setCurrentStep(0)}
+              className="mt-3 ml-9 w-[calc(100%-2.25rem)] max-w-xs bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] active:scale-[0.98] text-white font-bold py-3.5 rounded-full flex items-center justify-center gap-2 shadow-sm transition-all"
+            >
+              {t.startButton} <ArrowRight className="w-5 h-5" />
+            </button>
+          </motion.div>
+        )}
 
-          {/* Language Selection Step */}
-          {phase === 'language' && (
-            <motion.div key="language" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center">
-              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Globe className="w-10 h-10 text-[var(--color-primary)]" />
-              </div>
-              <p className="text-gray-800 mb-8 text-lg font-medium">Can you continue with English or Hausa?</p>
-              <div className="grid gap-3 max-w-sm mx-auto">
-                {SUPPORTED_LANGUAGES.map(lang => (
-                  <button
-                    key={lang}
-                    onClick={() => chooseLanguage(lang)}
-                    className="p-4 rounded-xl border border-gray-200 text-center transition-colors text-gray-700 font-semibold hover:border-green-300 hover:bg-green-50 text-lg"
-                  >
-                    {lang}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Welcome Step */}
-          {phase === 'wizard' && currentStep === -1 && (
-            <motion.div key="welcome" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center">
-              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <MessageCircle className="w-10 h-10 text-[var(--color-primary)]" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">{t.welcomeHeading}</h3>
-              <p className="text-gray-600 mb-8 text-lg">{t.welcomeSubtext}</p>
-
-              <button onClick={() => setCurrentStep(0)} className="btn-primary w-full max-w-sm mx-auto text-lg py-4 flex items-center justify-center gap-2">
-                {t.startButton} <ArrowRight className="w-5 h-5" />
-              </button>
-            </motion.div>
-          )}
-
-          {/* Question Steps */}
-          {phase === 'wizard' && currentStep >= 0 && currentStep < visibleQuestions.length && (
-            <motion.div key={`q-${currentStep}`} variants={containerVariants} initial="hidden" animate="visible" exit="exit">
-              <div className="mb-8">
-                <span className="text-[var(--color-primary)] font-bold text-sm uppercase tracking-widest mb-2 block">
-                  {t.questionLabel(currentStep + 1, visibleQuestions.length)}
-                </span>
-                <h3 className="text-2xl font-bold text-gray-800 leading-tight">
-                  {language === 'Hausa' && visibleQuestions[currentStep].questionTextHausa ? visibleQuestions[currentStep].questionTextHausa : visibleQuestions[currentStep].questionText}
-                </h3>
-              </div>
+        {/* Question Steps */}
+        {phase === 'wizard' && currentStep >= 0 && currentStep < visibleQuestions.length && (
+          <motion.div key={`q-${currentStep}`} variants={containerVariants} initial="hidden" animate="visible" exit="exit">
+            <AssistantBubble>
+              <span className="text-[var(--color-primary)] font-bold text-[11px] uppercase tracking-widest mb-1.5 block">
+                {t.questionLabel(currentStep + 1, visibleQuestions.length)}
+              </span>
+              <h3 className="text-lg font-bold text-gray-800 leading-snug mb-4">
+                {language === 'Hausa' && visibleQuestions[currentStep].questionTextHausa ? visibleQuestions[currentStep].questionTextHausa : visibleQuestions[currentStep].questionText}
+              </h3>
 
               {(visibleQuestions[currentStep].type === 'Radio' || visibleQuestions[currentStep].type === 'Dropdown') ? (
-                <div className="grid gap-3 mb-8">
+                <div className="grid gap-2.5">
                   {(language === 'Hausa' && visibleQuestions[currentStep].optionsHausa ? visibleQuestions[currentStep].optionsHausa : visibleQuestions[currentStep].options)?.map(opt => (
                     <button
                       key={opt}
                       onClick={() => handleAnswer(visibleQuestions[currentStep].id, visibleQuestions[currentStep].questionText, opt)}
-                      className="p-4 rounded-xl border border-gray-200 text-left transition-colors text-gray-700 hover:border-green-300 hover:bg-green-50 text-lg group flex items-center justify-between"
+                      className="py-3.5 px-4 rounded-full border-2 border-[var(--color-primary-light)] bg-[var(--color-primary-light)] text-left text-[var(--color-primary-dark)] font-semibold hover:border-[var(--color-primary)] hover:bg-white active:scale-[0.98] transition-all text-[15px] flex items-center justify-between"
                     >
                       {opt}
-                      <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-[var(--color-primary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <ArrowRight className="w-4 h-4 flex-shrink-0 ml-2 opacity-60" />
                     </button>
                   ))}
                 </div>
@@ -330,84 +344,88 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
                   continueLabel={t.continueButton}
                 />
               )}
+            </AssistantBubble>
 
-              <div className="flex justify-between mt-auto pt-4">
-                <button
-                  onClick={() => setCurrentStep(prev => prev - 1)}
-                  className="text-gray-500 font-medium px-4 py-2 hover:bg-gray-100 rounded-lg"
-                >
-                  {t.backButton}
-                </button>
+            <div className="flex justify-start mt-2 ml-9">
+              <button
+                onClick={() => setCurrentStep(prev => prev - 1)}
+                className="text-gray-500 text-sm font-medium px-3 py-1.5 hover:bg-white/60 rounded-full transition-colors"
+              >
+                {t.backButton}
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Contact Step */}
+        {phase === 'wizard' && currentStep === visibleQuestions.length && (
+          <motion.div key="contact" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
+            <AssistantBubble>
+              <div className="flex items-center gap-2 mb-1.5">
+                <User className="text-[var(--color-primary)] w-5 h-5" />
+                <h3 className="text-lg font-bold text-gray-800">{t.yourDetailsHeading}</h3>
               </div>
-            </motion.div>
-          )}
+              <p className="text-gray-600 text-[15px] mb-4">{t.yourDetailsSubtext}</p>
 
-          {/* Contact Step */}
-          {phase === 'wizard' && currentStep === visibleQuestions.length && (
-            <motion.div key="contact" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
-              <div className="flex items-center gap-3 mb-6">
-                <User className="text-[var(--color-primary)] w-6 h-6" />
-                <h3 className="text-xl font-bold text-gray-800">{t.yourDetailsHeading}</h3>
-              </div>
-              <p className="text-gray-600 mb-6">{t.yourDetailsSubtext}</p>
-
-              <div className="space-y-4 mb-8">
+              <div className="space-y-3 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.fullNameLabel}</label>
-                  <input type="text" value={displayName} onChange={e => setContactData({...contactData, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none" placeholder={t.fullNamePlaceholder} />
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">{t.fullNameLabel}</label>
+                  <input type="text" value={displayName} onChange={e => setContactData({...contactData, name: e.target.value})} className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none text-base" placeholder={t.fullNamePlaceholder} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneLabel}</label>
-                  <input type="tel" value={contactData.phone} onChange={e => setContactData({...contactData, phone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none" placeholder={t.phonePlaceholder} />
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">{t.phoneLabel}</label>
+                  <input type="tel" value={contactData.phone} onChange={e => setContactData({...contactData, phone: e.target.value})} className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none text-base" placeholder={t.phonePlaceholder} />
                 </div>
               </div>
 
-              <div className="flex justify-between">
-                <button onClick={() => setCurrentStep(prev => prev - 1)} className="text-gray-500 font-medium px-4 py-2 hover:bg-gray-100 rounded-lg">{t.backButton}</button>
-                <button
-                  onClick={submitLead}
-                  disabled={!displayName || !contactData.phone || loading}
-                  className="btn-accent py-3 px-8 text-base flex items-center justify-center min-w-[150px] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? t.processingButton : t.completeButton}
-                </button>
-              </div>
-            </motion.div>
-          )}
+              <button
+                onClick={submitLead}
+                disabled={!displayName || !contactData.phone || loading}
+                className="w-full bg-[var(--color-accent)] hover:bg-red-700 active:scale-[0.98] text-white font-bold py-3.5 rounded-full flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                {loading ? t.processingButton : t.completeButton}
+              </button>
+            </AssistantBubble>
 
-          {/* Optional Pre-Application Form Step */}
-          {phase === 'wizard' && showPreApplication && currentStep === visibleQuestions.length + 1 && (
-            <motion.div key="pre-application" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center">
-              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <User className="w-10 h-10 text-[var(--color-primary)]" />
-              </div>
-              <p className="text-gray-800 mb-8 text-lg font-medium leading-relaxed">
+            <div className="flex justify-start mt-2 ml-9">
+              <button onClick={() => setCurrentStep(prev => prev - 1)} className="text-gray-500 text-sm font-medium px-3 py-1.5 hover:bg-white/60 rounded-full transition-colors">{t.backButton}</button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Optional Pre-Application Form Step */}
+        {phase === 'wizard' && showPreApplication && currentStep === visibleQuestions.length + 1 && (
+          <motion.div key="pre-application" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
+            <AssistantBubble>
+              <p className="text-gray-800 text-[15px] font-medium leading-relaxed">
                 {campaign.preApplicationPrompt || t.defaultPreApplicationPrompt}
               </p>
-              <div className="grid gap-3 max-w-sm mx-auto">
-                <button onClick={() => respondToPreApplication(true)} className="btn-primary py-4 text-lg">
-                  {t.yesButton}
-                </button>
-                <button onClick={() => respondToPreApplication(false)} className="text-gray-500 font-medium px-4 py-3 hover:bg-gray-100 rounded-lg">
-                  {t.noButton}
-                </button>
-              </div>
-            </motion.div>
-          )}
+            </AssistantBubble>
+            <div className="grid grid-cols-2 gap-2.5 mt-3 ml-9">
+              <button onClick={() => respondToPreApplication(true)} className="py-3.5 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] active:scale-[0.97] text-white font-bold transition-all">
+                {t.yesButton}
+              </button>
+              <button onClick={() => respondToPreApplication(false)} className="py-3.5 rounded-full border-2 border-gray-200 text-gray-600 font-bold hover:bg-white active:scale-[0.97] transition-all">
+                {t.noButton}
+              </button>
+            </div>
+          </motion.div>
+        )}
 
-          {/* Success Step (WhatsApp Handoff) */}
-          {phase === 'wizard' && currentStep === visibleQuestions.length + (showPreApplication ? 2 : 1) && (
-            <motion.div key="success" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center py-8">
-              <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-12 h-12 text-green-600" />
+        {/* Success Step (WhatsApp Handoff) */}
+        {phase === 'wizard' && currentStep === visibleQuestions.length + (showPreApplication ? 2 : 1) && (
+          <motion.div key="success" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
+            <AssistantBubble>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="w-6 h-6 text-[var(--color-primary)] flex-shrink-0" />
+                <h3 className="text-lg font-bold text-gray-800">{t.successHeading}</h3>
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">{t.successHeading}</h3>
-              <p className="text-gray-600 mb-8 text-lg">
+              <p className="text-gray-600 text-[15px] mb-4">
                 {t.successSubtext(displayName, finalScore.category)}
               </p>
 
               {formOpened && formTemplate?.fileUrl && (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 text-left text-sm text-blue-800">
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3.5 mb-4 text-sm text-blue-800">
                   {t.formOpenedNote}{' '}
                   <a href={formTemplate.fileUrl} target="_blank" rel="noopener noreferrer" className="font-bold underline">
                     {t.openFormButton}
@@ -415,31 +433,31 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
                 </div>
               )}
 
-              <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-8 text-left">
-                <p className="font-bold text-green-800 mb-2">{t.nextStepLabel}</p>
-                <p className="text-sm text-green-700 mb-4">{t.nextStepBody}</p>
+              <div className="bg-[var(--color-primary-light)] rounded-2xl p-4">
+                <p className="font-bold text-[var(--color-primary-dark)] mb-1 text-sm">{t.nextStepLabel}</p>
+                <p className="text-sm text-gray-600 mb-3">{t.nextStepBody}</p>
 
                 <a
                   href={generateWhatsAppLink()}
                   onClick={trackWhatsAppClick}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-4 px-8 rounded-xl shadow-md hover:shadow-lg transition-all duration-300"
+                  className="w-full flex items-center justify-center gap-2.5 bg-[#25D366] hover:bg-[#128C7E] active:scale-[0.98] text-white font-bold py-3.5 px-6 rounded-full shadow-md transition-all"
                 >
-                  <MessageCircle className="w-6 h-6" /> {t.continueWhatsApp}
+                  <MessageCircle className="w-5 h-5" /> {t.continueWhatsApp}
                 </a>
               </div>
-            </motion.div>
-          )}
+            </AssistantBubble>
+          </motion.div>
+        )}
 
-        </AnimatePresence>
-      </div>
+      </AnimatePresence>
 
       {/* Progress Indicator */}
       {phase === 'wizard' && currentStep >= 0 && currentStep <= visibleQuestions.length && (
-        <div className="bg-gray-50 p-4 border-t border-gray-100 flex justify-center gap-2">
+        <div className="flex items-center gap-1.5 px-1 pt-1">
           {Array.from({ length: visibleQuestions.length + 1 }).map((_, idx) => (
-            <div key={idx} className={`h-2 w-full max-w-[40px] rounded-full ${idx <= currentStep ? 'bg-[var(--color-primary)]' : 'bg-gray-200 transition-colors duration-300'}`} />
+            <div key={idx} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${idx <= currentStep ? 'bg-[var(--color-primary)]' : 'bg-black/10'}`} />
           ))}
         </div>
       )}
