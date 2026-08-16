@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/client';
 import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
 import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
 import { ActivityLog, Notification } from './models-extensions';
-import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef } from './generators';
+import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef, generateAllocationRef } from './generators';
 import { DEFAULT_QUALIFICATION_QUESTIONS, DEFAULT_CONDITIONAL_QUESTION } from './defaultCampaignQuestions';
 
 // We use the browser client for the UI data layer
@@ -389,6 +389,12 @@ export const api = {
   async saveAllocation(alloc: Partial<Allocation>, client?: any): Promise<Allocation> {
     try {
       const supabase = client || getSupabase();
+      if (!alloc.id && !alloc.ref) {
+        const { count, error: countErr } = await supabase.from('allocations').select('*', { count: 'exact', head: true });
+        if (countErr) throw new Error(countErr.message);
+        alloc.ref = generateAllocationRef((count || 0) + 1);
+      }
+
       // Basic check for existing plot allocation
       if (!alloc.id && alloc.projectId && alloc.blockNumber && alloc.plotNumber) {
         const { count, error: countErr } = await supabase

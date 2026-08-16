@@ -480,6 +480,7 @@ export interface LedgerTransaction {
 
 export interface Allocation extends BaseRolePrep {
   id: string;
+  ref?: string;
   customerId: string;
   projectId: string;
   blockNumber: string;
