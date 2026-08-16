@@ -386,11 +386,12 @@ export const api = {
     }
   },
 
-  async saveAllocation(alloc: Partial<Allocation>): Promise<Allocation> {
+  async saveAllocation(alloc: Partial<Allocation>, client?: any): Promise<Allocation> {
     try {
+      const supabase = client || getSupabase();
       // Basic check for existing plot allocation
       if (!alloc.id && alloc.projectId && alloc.blockNumber && alloc.plotNumber) {
-        const { count, error: countErr } = await getSupabase()
+        const { count, error: countErr } = await supabase
           .from('allocations')
           .select('*', { count: 'exact', head: true })
           .eq('project_id', alloc.projectId)
@@ -405,7 +406,7 @@ export const api = {
       }
 
       const mapped = mapAllocationToDb(alloc);
-      const { data, error } = await getSupabase().from('allocations').upsert(mapped).select().single();
+      const { data, error } = await supabase.from('allocations').upsert(mapped).select().single();
       if (error) throw new Error(`Supabase error: ${error.message}`);
       return mapDbToAllocation(data);
     } catch (err) {
