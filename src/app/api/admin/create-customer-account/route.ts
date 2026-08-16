@@ -65,9 +65,9 @@ export async function POST(request: Request) {
         phone: formData.phone,
         address: fullAddress,
         status: 'Active',
-        nokName: formData.nokName,
-        nokPhone: formData.nokPhone,
-        nokRelation: formData.nokRelation
+        nextOfKinName: formData.nokName,
+        nextOfKinPhone: formData.nokPhone,
+        nextOfKinRelationship: formData.nokRelation
       }, supabaseAdmin);
 
       // 3. Auto-generate application
