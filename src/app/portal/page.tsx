@@ -31,17 +31,17 @@ export default function PortalDashboard() {
             const { data: app } = await supabase.from('applications').select('*').eq('customer_id', cust.id).order('created_at', { ascending: false }).limit(1).single();
             if (app) setApplication(app);
 
+            let linkedProjectId: string | null = null;
+
             const { data: alloc } = await supabase.from('allocations').select('*').eq('customer_id', cust.id).order('created_at', { ascending: false }).limit(1).single();
             if (alloc) {
               setAllocation(alloc);
-              if (alloc.project_id) {
-                const { data: proj } = await supabase.from('projects').select('*, locations(name)').eq('id', alloc.project_id).single();
-                if (proj) setProject({ ...proj, location: proj.locations?.name || proj.location });
-              }
+              if (alloc.project_id) linkedProjectId = alloc.project_id;
             }
 
             const { data: acc } = await supabase.from('easy_buy_accounts').select('*').eq('customer_id', cust.id).order('created_at', { ascending: false }).limit(1).single();
             if (acc) {
+              if (!linkedProjectId && acc.project_id) linkedProjectId = acc.project_id;
               // Convert keys back
               const mappedAcc = {
                 id: acc.id,
@@ -63,6 +63,11 @@ export default function PortalDashboard() {
                   status: i.status
                 } as Installment)));
               }
+            }
+
+            if (linkedProjectId) {
+              const { data: proj } = await supabase.from('projects').select('*, locations(name)').eq('id', linkedProjectId).single();
+              if (proj) setProject({ ...proj, location: proj.locations?.name || proj.location });
             }
           }
         }
