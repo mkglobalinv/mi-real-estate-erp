@@ -106,7 +106,6 @@ export async function updateSession(request: NextRequest) {
           '/chairman/allocations',
           '/chairman/finance',
           '/chairman/payments',
-          '/chairman/projects',
           '/chairman/leads'
         ];
         if (restrictedChairmanRoutes.some(r => pathname.startsWith(r))) {

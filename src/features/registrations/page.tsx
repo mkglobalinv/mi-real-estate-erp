@@ -221,7 +221,7 @@ export default function RegistrationsPage({ basePath = '/admin', params: routePa
                       <select required className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:border-[var(--color-primary)] outline-none"
                         value={formData.projectId} onChange={e => setFormData({...formData, projectId: e.target.value})}>
                         <option value="">Select an Estate...</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {projects.filter(p => !p.archived).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
                     </div>
                   </div>

@@ -92,6 +92,7 @@ export interface Project extends BaseRolePrep {
   startingPrice: number;
   easyBuyStatus: boolean;
   active: boolean;
+  archived?: boolean;
   createdAt: string;
 }
 

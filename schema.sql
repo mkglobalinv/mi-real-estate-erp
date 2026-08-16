@@ -511,3 +511,11 @@ ALTER TABLE public.campaign_questions
   ADD COLUMN IF NOT EXISTS question_text_hausa TEXT,
   ADD COLUMN IF NOT EXISTS options_hausa JSONB,
   ADD COLUMN IF NOT EXISTS options_scores JSONB;
+
+-- 28. PROJECT MANAGEMENT: ARCHIVE STATUS
+-- Projects are never hard-deleted because campaigns/reservations/allocations
+-- reference them via project_id. `archived` is a soft-removal flag on top of
+-- the existing `active` (Active/Paused) toggle: Active -> active=true,
+-- Paused -> active=false, Archived -> archived=true (active is forced false).
+ALTER TABLE public.projects
+  ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT false;

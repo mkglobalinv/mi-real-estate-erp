@@ -123,7 +123,7 @@ export default function CampaignForm({ initialData, isEdit, basePath = '/admin' 
             className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:outline-none"
           >
             <option value="">Select a Project</option>
-            {projects.map(p => (
+            {projects.filter(p => !p.archived).map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
