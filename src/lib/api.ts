@@ -394,6 +394,9 @@ export const api = {
         if (countErr) throw new Error(countErr.message);
         alloc.ref = generateAllocationRef((count || 0) + 1);
       }
+      if (!alloc.id && !alloc.allocationDate) {
+        alloc.allocationDate = new Date().toISOString().split('T')[0];
+      }
 
       // Basic check for existing plot allocation
       if (!alloc.id && alloc.projectId && alloc.blockNumber && alloc.plotNumber) {
