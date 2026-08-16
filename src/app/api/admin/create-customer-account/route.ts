@@ -100,8 +100,9 @@ export async function POST(request: Request) {
       let remainingBalance = formData.totalAmount - formData.initialDeposit;
       
       for (let i = 1; i <= formData.installmentPeriod; i++) {
+        currentDate.setMonth(currentDate.getMonth() + 1);
         const currentInstAmount = (i === formData.installmentPeriod) ? remainingBalance : monthlyInst;
-        
+
         await api.saveInstallment({
           accountId: ebAccount.id,
           installmentNumber: i,
@@ -109,9 +110,8 @@ export async function POST(request: Request) {
           dueDate: currentDate.toISOString().split('T')[0],
           status: 'Pending'
         }, supabaseAdmin);
-        
+
         remainingBalance -= currentInstAmount;
-        currentDate.setMonth(currentDate.getMonth() + 1);
       }
       
       // 6. Allocation Prep (if Plot Number provided)
