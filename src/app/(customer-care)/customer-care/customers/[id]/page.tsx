@@ -1,4 +1,5 @@
 import CustomerCarePage from '@/features/customers/[id]/page';
-export default function Page({ params }: any) {
-  return <CustomerCarePage basePath="/customer-care" params={params} />;
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
+  return <CustomerCarePage basePath="/customer-care" params={resolvedParams} />;
 }
