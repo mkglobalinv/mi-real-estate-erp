@@ -115,6 +115,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               <CheckSquare className={iconClass('/secretary/applications')} />
               Application Records
             </Link>
+            <Link href="/secretary/payments" onClick={closeMenu} className={linkClass('/secretary/payments')}>
+              <Wallet className={iconClass('/secretary/payments')} />
+              Payment Verification
+            </Link>
           </nav>
         </div>
         
