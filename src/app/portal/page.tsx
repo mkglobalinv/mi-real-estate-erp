@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   CheckCircle2, Clock, MapPin, Wallet, ArrowRight,
-  ShieldCheck, AlertCircle, FileText
+  ShieldCheck, AlertCircle, FileText, Building2, Navigation, Users
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -270,32 +270,37 @@ export default function PortalDashboard() {
 
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-extrabold text-gray-900 mb-4">Property Details</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between items-end border-b border-gray-50 pb-3">
-                <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Estate Project</p>
-                  <p className="font-bold text-gray-900">{project?.name || 'TBD'}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-[var(--color-primary)] shrink-0" />
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Estate Project</p>
                 </div>
+                <p className="font-bold text-gray-900 text-sm leading-snug">{project?.name || 'TBD'}</p>
               </div>
-              <div className="flex justify-between items-end border-b border-gray-50 pb-3">
-                <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Property Allocation</p>
-                  <p className="font-bold text-gray-900">
-                    {isAllocated ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending Allocation'}
-                  </p>
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-[var(--color-primary)] shrink-0" />
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Allocation</p>
                 </div>
+                <p className="font-bold text-gray-900 text-sm leading-snug">
+                  {isAllocated ? `Plot ${allocation?.plot_number}, Block ${allocation?.block_number}` : 'Pending Allocation'}
+                </p>
               </div>
-              <div className="flex justify-between items-end border-b border-gray-50 pb-3">
-                <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Location</p>
-                  <p className="font-bold text-gray-900">{project?.location || 'TBD'}</p>
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Navigation className="w-3.5 h-3.5 text-[var(--color-primary)] shrink-0" />
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Location</p>
                 </div>
+                <p className="font-bold text-gray-900 text-sm leading-snug">{project?.location || 'TBD'}</p>
               </div>
-              <div className="flex justify-between items-end pb-1">
-                <div>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Next of Kin</p>
-                  <p className="font-bold text-gray-900">{customer?.nok_name || customer?.nextOfKinName || 'N/A'} - {customer?.nok_phone || customer?.nextOfKinPhone || 'N/A'}</p>
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Users className="w-3.5 h-3.5 text-[var(--color-primary)] shrink-0" />
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Next of Kin</p>
                 </div>
+                <p className="font-bold text-gray-900 text-sm leading-snug">{customer?.nok_name || customer?.nextOfKinName || 'N/A'}</p>
+                <p className="text-xs text-gray-500">{customer?.nok_phone || customer?.nextOfKinPhone || 'N/A'}</p>
               </div>
             </div>
           </div>
