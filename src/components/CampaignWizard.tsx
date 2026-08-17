@@ -271,7 +271,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
               onClick={() => setPhase('language')}
               className="mt-3 ml-9 w-[calc(100%-2.25rem)] max-w-xs bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] active:scale-[0.98] text-white font-bold py-3.5 rounded-full flex items-center justify-center gap-2 shadow-sm transition-all"
             >
-              Continue <ArrowRight className="w-5 h-5" />
+              {t.continueButton} <ArrowRight className="w-5 h-5" />
             </button>
           </motion.div>
         )}
@@ -280,7 +280,7 @@ export default function CampaignWizard({ campaign, questions }: { campaign: Camp
         {phase === 'language' && (
           <motion.div key="language" variants={containerVariants} initial="hidden" animate="visible" exit="exit">
             <AssistantBubble>
-              <p className="text-gray-800 text-[15px] font-medium">Can you continue with English or Hausa?</p>
+              <p className="text-gray-800 text-[15px] font-medium">{t.languagePrompt}</p>
             </AssistantBubble>
             <div className="grid grid-cols-2 gap-2.5 mt-3 ml-9">
               {SUPPORTED_LANGUAGES.map(lang => (
