@@ -3,11 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { Allocation, Customer, Project } from '@/lib/types';
-import { 
-  MapPin, Search, Filter, CheckCircle2, Clock, 
-  Map, ShieldCheck, UserCheck, X
+import {
+  MapPin, Search, Filter, CheckCircle2, Clock,
+  Map, ShieldCheck, UserCheck, X, Pencil
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+
+const ALLOCATION_STATUSES: Allocation['status'][] = ['Not Allocated', 'Pending Allocation', 'Approved', 'Allocated', 'Revoked'];
 
 export default function AllocationsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
   const [allocations, setAllocations] = useState<Allocation[]>([]);
@@ -19,6 +21,11 @@ export default function AllocationsPage({ basePath = '/admin', params: routePara
   const [formData, setFormData] = useState({
     customerId: '', projectId: '', blockNumber: '', plotNumber: ''
   });
+
+  // Edit existing allocation
+  const [editingAlloc, setEditingAlloc] = useState<Allocation | null>(null);
+  const [editForm, setEditForm] = useState({ projectId: '', blockNumber: '', plotNumber: '', status: 'Pending Allocation' as Allocation['status'] });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -53,6 +60,36 @@ export default function AllocationsPage({ basePath = '/admin', params: routePara
       loadData();
     } catch (error: any) {
       toast.error(error.message || 'Failed to recommend allocation');
+    }
+  };
+
+  const openEdit = (alloc: Allocation) => {
+    setEditingAlloc(alloc);
+    setEditForm({
+      projectId: alloc.projectId || '',
+      blockNumber: alloc.blockNumber || '',
+      plotNumber: alloc.plotNumber || '',
+      status: alloc.status
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAlloc) return;
+    setSavingEdit(true);
+    try {
+      // Spread the full existing record before the edited fields - saveAllocation
+      // upserts, and Postgres validates NOT NULL on the proposed row even when
+      // updating an existing one, so a partial payload can fail on columns
+      // that aren't actually changing.
+      await api.saveAllocation({ ...editingAlloc, ...editForm });
+      toast.success('Allocation updated');
+      setEditingAlloc(null);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update allocation');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -132,13 +169,16 @@ export default function AllocationsPage({ basePath = '/admin', params: routePara
                         </span>
                       </td>
                       <td className="p-4 text-right">
-                        {alloc.status === 'Allocated' ? (
-                          <button onClick={() => toast.error('Generate Letter flow coming soon')} className="text-[var(--color-primary)] hover:text-green-800 font-bold text-sm">
-                            Generate Letter
+                        <div className="flex justify-end items-center gap-3">
+                          {alloc.status === 'Allocated' && (
+                            <button onClick={() => toast.error('Generate Letter flow coming soon')} className="text-[var(--color-primary)] hover:text-green-800 font-bold text-sm">
+                              Generate Letter
+                            </button>
+                          )}
+                          <button onClick={() => openEdit(alloc)} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-gray-50 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
+                            <Pencil className="w-3.5 h-3.5" /> Edit
                           </button>
-                        ) : (
-                          <span className="text-gray-300 text-sm font-medium">Awaiting Chairman</span>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -198,6 +238,60 @@ export default function AllocationsPage({ basePath = '/admin', params: routePara
             <div className="p-6 border-t border-gray-100 bg-white">
               <button form="allocForm" type="submit" className="w-full btn-primary py-4 text-base shadow-lg shadow-green-200 flex justify-center gap-2 items-center">
                 <ShieldCheck className="w-5 h-5" /> Submit to Chairman
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Allocation */}
+      {editingAlloc && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+              <div>
+                <h2 className="text-xl font-extrabold text-gray-900">Edit Allocation</h2>
+                <p className="text-sm text-gray-500">{getCustomer(editingAlloc.customerId)?.fullName || 'Unknown customer'}</p>
+              </div>
+              <button onClick={() => setEditingAlloc(null)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500"><X className="w-5 h-5" /></button>
+            </div>
+
+            <form id="editAllocForm" onSubmit={handleSaveEdit} className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Estate Project</label>
+                <select required className="w-full border-gray-200 rounded-xl px-4 py-3 focus:ring-[var(--color-primary)] bg-gray-50"
+                  value={editForm.projectId} onChange={e => setEditForm({ ...editForm, projectId: e.target.value })}>
+                  <option value="">Select an Estate...</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Block Number</label>
+                  <input required type="text" className="w-full border-gray-200 rounded-xl px-4 py-3 focus:ring-[var(--color-primary)] bg-gray-50"
+                    value={editForm.blockNumber} onChange={e => setEditForm({ ...editForm, blockNumber: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Plot Number</label>
+                  <input required type="text" className="w-full border-gray-200 rounded-xl px-4 py-3 focus:ring-[var(--color-primary)] bg-gray-50"
+                    value={editForm.plotNumber} onChange={e => setEditForm({ ...editForm, plotNumber: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Status</label>
+                <select className="w-full border-gray-200 rounded-xl px-4 py-3 focus:ring-[var(--color-primary)] bg-gray-50"
+                  value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value as Allocation['status'] })}>
+                  {ALLOCATION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </form>
+
+            <div className="p-6 border-t border-gray-100 flex gap-3">
+              <button type="button" onClick={() => setEditingAlloc(null)} className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+                Cancel
+              </button>
+              <button form="editAllocForm" type="submit" disabled={savingEdit} className="flex-1 btn-primary py-3 font-bold disabled:opacity-60">
+                {savingEdit ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
