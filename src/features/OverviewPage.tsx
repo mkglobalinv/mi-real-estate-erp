@@ -26,6 +26,11 @@ const DirectorDashboard = dynamic(() => import('@/components/admin/dashboards/Di
   loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded-xl mb-4"></div>
 });
 
+const SecretaryDashboard = dynamic(() => import('@/components/admin/dashboards/SecretaryDashboard'), {
+  ssr: false,
+  loading: () => <div className="animate-pulse h-32 bg-gray-100 rounded-xl mb-4"></div>
+});
+
 export default function AdminOverviewDashboard({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
   const { role, loading: roleLoading } = useRole();
   const [leads, setLeads] = React.useState<any[] | null>(null);
@@ -49,12 +54,14 @@ export default function AdminOverviewDashboard({ basePath = '/admin', params: ro
   const isCC = role === 'Customer Care' || role === 'Super Admin';
   const isChairman = role === 'Chairman' || role === 'Super Admin';
   const isDirector = role === 'Director' || role === 'Super Admin';
+  const isSecretary = role === 'Secretary' || role === 'Super Admin';
 
   const getDashboardTitle = () => {
     if (role === 'Social Media Director') return 'Marketing & Campaigns';
     if (role === 'Customer Care') return 'Customer Care Operations';
     if (role === 'Chairman') return 'Executive Dashboard';
     if (role === 'Director') return 'Director Dashboard';
+    if (role === 'Secretary') return 'Secretary Dashboard';
     if (role === 'Admin Engineer') return 'System Overview';
     return 'Overview Dashboard';
   };
@@ -72,7 +79,8 @@ export default function AdminOverviewDashboard({ basePath = '/admin', params: ro
             {role === 'Customer Care' && 'Monitor follow-ups, tickets, and pipeline conversions.'}
             {role === 'Chairman' && 'Executive overview of revenue, operations, and approvals.'}
             {role === 'Director' && 'Review applications and documentation.'}
-            {!['Social Media Director', 'Customer Care', 'Chairman', 'Director'].includes(role || '') && 'Manage digital properties and system health.'}
+            {role === 'Secretary' && 'Registrations, applications, and payment verification.'}
+            {!['Social Media Director', 'Customer Care', 'Chairman', 'Director', 'Secretary'].includes(role || '') && 'Manage digital properties and system health.'}
           </p>
         </div>
       </div>
@@ -81,6 +89,7 @@ export default function AdminOverviewDashboard({ basePath = '/admin', params: ro
       {isCC && <CCDashboard leads={role === 'Super Admin' ? leads : undefined} />}
       {isDirector && <DirectorDashboard />}
       {isChairman && <ChairmanDashboard />}
+      {isSecretary && <SecretaryDashboard basePath={basePath} />}
     </div>
   );
 }
