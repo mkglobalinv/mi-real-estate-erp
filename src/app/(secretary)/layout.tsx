@@ -119,6 +119,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               <Wallet className={iconClass('/secretary/payments')} />
               Payment Verification
             </Link>
+            <Link href="/secretary/allocations" onClick={closeMenu} className={linkClass('/secretary/allocations')}>
+              <MapPin className={iconClass('/secretary/allocations')} />
+              Allocations
+            </Link>
           </nav>
         </div>
         

@@ -15,6 +15,7 @@ import {
   Bell,
   ExternalLink,
   PlusCircle,
+  MapPin,
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
@@ -54,6 +55,7 @@ const NAV_SECTIONS = [
     color: 'text-gray-500',
     items: [
       { label: 'Estate Projects', href: '/director/projects', icon: FolderGit2, exact: false },
+      { label: 'Allocations', href: '/director/allocations', icon: MapPin, exact: false },
       { label: 'Inspection Records', href: '/director/inspections', icon: Calendar, exact: false },
     ],
   },
