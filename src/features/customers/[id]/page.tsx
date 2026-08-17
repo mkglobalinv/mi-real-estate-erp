@@ -3,9 +3,37 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { Customer } from '@/lib/types';
-import { User, Mail, Phone, MapPin, Briefcase, FileText, UploadCloud, Pencil, Trash2, X, AlertTriangle } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
+import { Customer, Application, Allocation, Project } from '@/lib/types';
+import { User, Mail, Phone, MapPin, Briefcase, FileText, UploadCloud, Pencil, Trash2, X, AlertTriangle, Eye, Download, CheckCircle2, Clock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+
+interface DocumentRow {
+  id: string;
+  title: string;
+  file_url: string;
+  generated_date: string | null;
+}
+
+function fileExtension(url: string): string {
+  const clean = url.split('?')[0];
+  const match = clean.match(/\.([a-zA-Z0-9]+)$/);
+  return match ? match[1] : 'pdf';
+}
+
+async function downloadFile(url: string, filename: string) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Could not fetch file (${res.status})`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}
 
 type EditableCustomer = {
   fullName: string;
@@ -27,7 +55,13 @@ const emptyEdit: EditableCustomer = {
 export default function CustomerProfilePage({ params, basePath = '/admin', readOnly = false }: { params: { id: string }, basePath?: string, readOnly?: boolean }) {
   const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editForm, setEditForm] = useState<EditableCustomer>(emptyEdit);
@@ -46,10 +80,65 @@ export default function CustomerProfilePage({ params, basePath = '/admin', readO
       const allCustomers = await api.getCustomers();
       const c = allCustomers.find(c => c.id === params.id) || null;
       setCustomer(c);
+      if (c) {
+        const [apps, allocs, projs, docs] = await Promise.all([
+          api.getApplications(),
+          api.getAllocations(),
+          api.getProjects(),
+          api.getDocuments(c.id),
+        ]);
+        setApplications(apps.filter(a => a.customerId === c.id));
+        setAllocations(allocs.filter(a => a.customerId === c.id));
+        setProjects(projs);
+        setDocuments(docs as DocumentRow[]);
+      }
     } catch (err: any) {
       toast.error('Failed to load customer profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getProjectName = (projectId?: string) => projectId ? projects.find(p => p.id === projectId)?.name : undefined;
+
+  const handleDownloadDocument = async (doc: DocumentRow) => {
+    setDownloadingId(doc.id);
+    try {
+      await downloadFile(doc.file_url, `${doc.title}.${fileExtension(doc.file_url)}`);
+    } catch (err: any) {
+      toast.error(err.message || `Failed to download ${doc.title}`);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleUploadDocument = async (file: File) => {
+    if (!customer) return;
+    setUploadingDoc(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split('.').pop();
+      const path = `customer-docs/${customer.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: storageError } = await supabase.storage.from('payment-proofs').upload(path, file);
+      if (storageError) throw new Error(`Failed to upload: ${storageError.message}`);
+      const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
+      if (!urlData?.publicUrl) throw new Error('Failed to generate a URL for the uploaded file.');
+
+      await api.saveDocument({
+        title: file.name.replace(/\.[^.]+$/, ''),
+        type: 'Registration',
+        customer_id: customer.id,
+        customer_ref: customer.ref,
+        file_url: urlData.publicUrl,
+        generated_date: new Date().toISOString(),
+      });
+
+      toast.success('Document uploaded');
+      loadCustomer();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload document');
+    } finally {
+      setUploadingDoc(false);
     }
   };
 
@@ -194,24 +283,100 @@ export default function CustomerProfilePage({ params, basePath = '/admin', readO
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex justify-between items-center mb-6 border-b pb-2">
               <h2 className="text-xl font-bold text-gray-900">Applications & Allocations</h2>
+              {!readOnly && allocations.length > 0 && (
+                <a href={`${basePath}/allocations`} className="text-[var(--color-primary)] font-bold text-sm hover:underline">Manage Allocations</a>
+              )}
             </div>
-            <div className="text-center py-8 text-gray-500">
-              <p>No applications found for this customer.</p>
-            </div>
+
+            {applications.length === 0 && allocations.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No applications or allocations found for this customer.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {applications.map(app => (
+                  <div key={app.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-800">Application {app.ref}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          {app.documentsVerified ? <CheckCircle2 className="w-3 h-3 text-green-500" /> : <Clock className="w-3 h-3 text-amber-500" />}
+                          {app.documentsVerified ? 'Documents verified' : 'Documents pending'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">{app.status}</span>
+                  </div>
+                ))}
+                {allocations.map(alloc => (
+                  <div key={alloc.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-800">{getProjectName(alloc.projectId) || 'Unknown Project'}</p>
+                        <p className="text-xs text-gray-500">Plot {alloc.plotNumber}, Block {alloc.blockNumber}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${
+                      alloc.status === 'Allocated' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>{alloc.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex justify-between items-center mb-6 border-b pb-2">
               <h2 className="text-xl font-bold text-gray-900">Documents</h2>
               {!readOnly && (
-                <button onClick={() => toast.error('Document Upload not implemented')} className="text-[var(--color-primary)] font-bold text-sm flex items-center gap-1 hover:bg-green-50 px-3 py-1.5 rounded-lg transition-colors">
-                  <UploadCloud className="w-4 h-4" /> Upload Document
-                </button>
+                <label className={`font-bold text-sm flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                  uploadingDoc ? 'text-gray-400' : 'text-[var(--color-primary)] hover:bg-green-50'
+                }`}>
+                  <UploadCloud className="w-4 h-4" /> {uploadingDoc ? 'Uploading...' : 'Upload Document'}
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    className="hidden"
+                    disabled={uploadingDoc}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUploadDocument(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
               )}
             </div>
-            <div className="text-center py-8 text-gray-500">
-              <p>No documents uploaded yet.</p>
-            </div>
+
+            {documents.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No documents uploaded yet.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {documents.map(doc => (
+                  <div key={doc.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-800 truncate">{doc.title}</p>
+                        <p className="text-xs text-gray-400">{doc.generated_date ? new Date(doc.generated_date).toLocaleDateString() : 'Date not set'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-bold text-gray-600 hover:underline">
+                        <Eye className="w-3.5 h-3.5" /> View
+                      </a>
+                      <button onClick={() => handleDownloadDocument(doc)} disabled={downloadingId === doc.id} className="flex items-center gap-1 text-xs font-bold text-[var(--color-primary)] hover:underline disabled:opacity-50">
+                        <Download className="w-3.5 h-3.5" /> {downloadingId === doc.id ? 'Downloading...' : 'Download'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
