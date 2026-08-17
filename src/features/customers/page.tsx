@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { createClient } from '@/utils/supabase/client';
 import { Customer, Project } from '@/lib/types';
-import { Users, Search, ChevronRight, CheckCircle2, Clock, PlusCircle, X, Copy, Check } from 'lucide-react';
+import { Users, Search, ChevronRight, CheckCircle2, Clock, PlusCircle, X, Copy, Check, UploadCloud, FileText, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 
@@ -28,6 +29,9 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
     // Section D
     nokName: '', nokPhone: '', nokRelation: ''
   });
+  // Section E
+  const [documentFiles, setDocumentFiles] = useState<File[]>([]);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -51,18 +55,43 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
     
     try {
       const emailToUse = formData.email || `customer-${Date.now()}@mirealestate.portal`;
-      
-      // 1. Create Portal Account & Save to Database via API
+
+      // 1. Upload any Customer Documents first, so their URLs can be sent
+      // to the API alongside the rest of the form (file objects can't go
+      // through the JSON body below). A file that fails to upload is
+      // skipped with a warning rather than blocking account creation.
+      const customerDocuments: { title: string; fileUrl: string }[] = [];
+      if (documentFiles.length > 0) {
+        setUploadingDocs(true);
+        const supabase = createClient();
+        for (const file of documentFiles) {
+          try {
+            const ext = file.name.split('.').pop();
+            const path = `customer-docs/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+            const { error: storageError } = await supabase.storage.from('payment-proofs').upload(path, file);
+            if (storageError) throw storageError;
+            const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
+            if (!urlData?.publicUrl) throw new Error('Failed to generate file URL');
+            customerDocuments.push({ title: file.name.replace(/\.[^.]+$/, ''), fileUrl: urlData.publicUrl });
+          } catch (uploadErr: any) {
+            toast.error(`Failed to upload ${file.name}: ${uploadErr.message || 'unknown error'}`);
+          }
+        }
+        setUploadingDocs(false);
+      }
+
+      // 2. Create Portal Account & Save to Database via API
       const authRes = await fetch('/api/admin/create-customer-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: emailToUse, 
-          fullName: formData.fullName, 
+        body: JSON.stringify({
+          email: emailToUse,
+          fullName: formData.fullName,
           phone: formData.phone,
           formData: {
             ...formData,
-            monthlyInst: calculateInstallments()
+            monthlyInst: calculateInstallments(),
+            customerDocuments
           }
         })
       });
@@ -104,6 +133,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
       initialDeposit: 0, installmentPeriod: 12, installmentStartDate: '',
       nokName: '', nokPhone: '', nokRelation: ''
     });
+    setDocumentFiles([]);
   };
 
   const filteredCustomers = customers.filter(c => {
@@ -364,6 +394,46 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
                       </div>
                     </div>
                   </div>
+
+                  {/* SECTION E */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-3 mb-4 text-[var(--color-primary)]">Section E: Customer Documents</h3>
+                    <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-[var(--color-primary)] transition-colors bg-gray-50">
+                      <UploadCloud className="w-7 h-7 text-gray-400 mb-1" />
+                      <span className="text-sm text-gray-500">Click to upload ID, agreements, or other files</span>
+                      <span className="text-xs text-gray-400">PDF, JPEG or PNG - multiple files allowed</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        multiple
+                        className="hidden"
+                        onChange={e => {
+                          const files = Array.from(e.target.files ?? []);
+                          if (files.length) setDocumentFiles(prev => [...prev, ...files]);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {documentFiles.length > 0 && (
+                      <ul className="mt-4 space-y-2">
+                        {documentFiles.map((file, idx) => (
+                          <li key={`${file.name}-${idx}`} className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="w-4 h-4 text-gray-400 shrink-0" />
+                              <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setDocumentFiles(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-gray-400 hover:text-red-500 shrink-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </form>
               )}
             </div>
@@ -371,7 +441,8 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
             {!successData && (
               <div className="p-6 border-t border-gray-100 bg-white shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
                 <button disabled={isLoading} form="custForm" type="submit" className="w-full btn-primary py-4 text-base font-bold shadow-lg shadow-green-200 flex items-center justify-center gap-2 transition-all">
-                  {isLoading ? <Clock className="w-5 h-5 animate-spin" /> : 'CREATE CUSTOMER PORTAL'}
+                  {isLoading ? <Clock className="w-5 h-5 animate-spin" /> : null}
+                  {isLoading ? (uploadingDocs ? 'UPLOADING DOCUMENTS...' : 'CREATING PORTAL...') : 'CREATE CUSTOMER PORTAL'}
                 </button>
               </div>
             )}

@@ -124,6 +124,25 @@ export async function POST(request: Request) {
           status: 'Pending Allocation'
         }, supabaseAdmin);
       }
+
+      // 7. Save Customer Documents (already uploaded to storage client-side;
+      // formData.customerDocuments carries the resulting file URLs). Each
+      // insert is independent so one bad file doesn't block the rest of
+      // account creation, which has already succeeded by this point.
+      if (Array.isArray(formData.customerDocuments)) {
+        for (const doc of formData.customerDocuments) {
+          if (!doc?.fileUrl) continue;
+          const { error: docError } = await supabaseAdmin.from('documents').insert({
+            title: doc.title || 'Customer Document',
+            type: 'Registration',
+            customer_id: newCustomer.id,
+            customer_ref: newCustomer.ref,
+            file_url: doc.fileUrl,
+            generated_date: new Date().toISOString()
+          });
+          if (docError) console.error('Failed to save customer document:', docError.message);
+        }
+      }
     }
 
     return NextResponse.json({
