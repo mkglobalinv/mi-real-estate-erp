@@ -733,3 +733,36 @@ CREATE POLICY "banners_delete_authenticated" ON public.banners
   FOR DELETE
   TO authenticated
   USING (true);
+
+-- 33. PRODUCTION HOTFIX
+-- Marking the "banners" bucket public (section 32) only controls read
+-- access to the public URL — it does not grant permission to upload into
+-- it. storage.objects has RLS enabled by default with no bucket-scoped
+-- policy, so every upload from the Chairman/Admin banner manager
+-- (src/features/banners/page.tsx) failed with "new row violates row-level
+-- security policy". Adds the missing bucket-scoped policies, matching this
+-- schema's existing posture (public read, authenticated write).
+DROP POLICY IF EXISTS "banners_bucket_select" ON storage.objects;
+CREATE POLICY "banners_bucket_select" ON storage.objects
+  FOR SELECT
+  TO anon, authenticated
+  USING (bucket_id = 'banners');
+
+DROP POLICY IF EXISTS "banners_bucket_insert" ON storage.objects;
+CREATE POLICY "banners_bucket_insert" ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'banners');
+
+DROP POLICY IF EXISTS "banners_bucket_update" ON storage.objects;
+CREATE POLICY "banners_bucket_update" ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'banners')
+  WITH CHECK (bucket_id = 'banners');
+
+DROP POLICY IF EXISTS "banners_bucket_delete" ON storage.objects;
+CREATE POLICY "banners_bucket_delete" ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'banners');
