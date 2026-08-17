@@ -156,6 +156,11 @@ export const api = {
     }
   },
 
+  async deleteCustomer(id: string): Promise<void> {
+    const { error } = await getSupabase().from('customers').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
   // --- EASY BUY ACCOUNTS ---
   async getEasyBuyAccounts(): Promise<EasyBuyAccount[]> {
     try {
