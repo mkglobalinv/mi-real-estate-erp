@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { createClient } from '@/utils/supabase/client';
 import { PaymentProof, Customer, EasyBuyAccount, Allocation, Project, Installment } from '@/lib/types';
 import {
-  CreditCard, Check, X, Eye, FileText, Calendar, MapPin, CheckCircle2, XCircle
+  CreditCard, Check, X, Eye, FileText, Calendar, MapPin, CheckCircle2, XCircle, Upload, Receipt as ReceiptIcon
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -19,6 +19,19 @@ function isImageUrl(url: string): boolean {
   return /\.(jpe?g|png|gif|webp)$/i.test(url);
 }
 
+// payment_proofs has no receipt/document link column, so the uploaded
+// receipt's documents.id is stored in notes as "receipt:<id>" once a
+// payment is approved. notes only ever holds a rejection reason on
+// Rejected proofs, so these two uses never collide.
+const RECEIPT_NOTE_PREFIX = 'receipt:';
+
+interface DocumentRow {
+  id: string;
+  title: string;
+  file_url: string;
+  customer_id: string;
+}
+
 type Tab = 'pending' | 'approved' | 'rejected';
 
 export default function SecretaryPaymentsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
@@ -28,6 +41,7 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
+  const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('pending');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -38,13 +52,14 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
   }, []);
 
   const loadData = async () => {
-    const [pf, cs, ac, al, pr, inst] = await Promise.all([
+    const [pf, cs, ac, al, pr, inst, docs] = await Promise.all([
       api.getPaymentProofs(),
       api.getCustomers(),
       api.getEasyBuyAccounts(),
       api.getAllocations(),
       api.getProjects(),
       api.getInstallments(),
+      api.getDocuments(),
     ]);
 
     setProofs(pf);
@@ -53,6 +68,7 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
     setAllocations(al);
     setProjects(pr);
     setInstallments(inst);
+    setDocuments(docs as DocumentRow[]);
   };
 
   const getCustomer = (id: string) => customers.find(c => c.id === id);
@@ -70,6 +86,64 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
   const cancelReject = () => {
     setRejectingId(null);
     setRejectReason('');
+  };
+
+  const getReceiptForProof = (proof: PaymentProof) => {
+    if (!proof.notes?.startsWith(RECEIPT_NOTE_PREFIX)) return null;
+    const docId = proof.notes.slice(RECEIPT_NOTE_PREFIX.length);
+    return documents.find(d => d.id === docId) || null;
+  };
+
+  const handleUploadReceipt = async (proof: PaymentProof, file: File) => {
+    const customer = getCustomer(proof.customerId);
+    if (!customer) {
+      toast.error('Could not find this customer record.');
+      return;
+    }
+
+    setBusyId(proof.id);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Reuse the payment-proofs bucket - it already exists and already has
+      // an authenticated upload policy, rather than requiring a new bucket.
+      const ext = file.name.split('.').pop();
+      const fileName = `receipts/${proof.customerId}/receipt_${Date.now()}.${ext}`;
+      const { error: storageError } = await supabase.storage.from('payment-proofs').upload(fileName, file);
+      if (storageError) throw new Error(`Failed to upload receipt: ${storageError.message}`);
+      const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(fileName);
+      if (!urlData?.publicUrl) throw new Error('Failed to generate a URL for the uploaded receipt.');
+
+      const doc = await api.saveDocument({
+        title: `Receipt - ${proof.appliedTo}`,
+        type: 'Financial',
+        customer_id: proof.customerId,
+        customer_ref: customer.ref,
+        file_url: urlData.publicUrl,
+        generated_date: new Date().toISOString(),
+        created_by: user?.id,
+      }) as DocumentRow;
+
+      // Link the receipt to this specific payment (see RECEIPT_NOTE_PREFIX).
+      await api.savePaymentProof({
+        ...proof,
+        notes: `${RECEIPT_NOTE_PREFIX}${doc.id}`,
+      });
+
+      await api.logActivity({
+        user: 'Secretary',
+        module: 'Payments',
+        action: `Uploaded receipt for ${customer.fullName} (${proof.appliedTo})`
+      });
+
+      toast.success('Receipt uploaded. The customer can now view it under My Statements.');
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload receipt');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleApprove = async (proof: PaymentProof) => {
@@ -233,6 +307,7 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
             const installment = getInstallmentForProof(proof);
             const isRejecting = rejectingId === proof.id;
             const busy = busyId === proof.id;
+            const receipt = activeTab === 'approved' ? getReceiptForProof(proof) : null;
 
             return (
               <div key={proof.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -323,6 +398,36 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
                           <X className="w-4 h-4" /> Reject
                         </button>
                       </>
+                    )
+                  )}
+
+                  {activeTab === 'approved' && (
+                    receipt ? (
+                      <a
+                        href={receipt.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"
+                      >
+                        <ReceiptIcon className="w-4 h-4" /> View Receipt
+                      </a>
+                    ) : (
+                      <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-colors cursor-pointer ${
+                        busy ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100'
+                      }`}>
+                        <Upload className="w-4 h-4" /> {busy ? 'Uploading...' : 'Upload Receipt'}
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.pdf"
+                          className="hidden"
+                          disabled={busy}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadReceipt(proof, file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
                     )
                   )}
                 </div>
