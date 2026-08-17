@@ -87,7 +87,7 @@ export default function AdminOverviewDashboard({ basePath = '/admin', params: ro
 
       {isSMD && <SMDDashboard leads={role === 'Super Admin' ? leads : undefined} />}
       {isCC && <CCDashboard leads={role === 'Super Admin' ? leads : undefined} />}
-      {isDirector && <DirectorDashboard />}
+      {isDirector && <DirectorDashboard basePath={basePath} />}
       {isChairman && <ChairmanDashboard />}
       {isSecretary && <SecretaryDashboard basePath={basePath} />}
     </div>
