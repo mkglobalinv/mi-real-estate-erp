@@ -118,16 +118,16 @@ export default function PortalDashboard() {
 
       {/* Account Status Center */}
       <h2 className="text-xl font-extrabold text-gray-900 mb-4 px-1">Live Status Center</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+
         {/* Registration Status */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-start gap-4">
-          <div className={`p-3 rounded-full shrink-0 ${isChairmanApproved ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
-            {isChairmanApproved ? <ShieldCheck className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+          <div className={`p-2.5 sm:p-3 rounded-full shrink-0 ${isChairmanApproved ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+            {isChairmanApproved ? <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" /> : <Clock className="w-5 h-5 sm:w-6 sm:h-6" />}
           </div>
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Registration</p>
-            <p className="text-lg font-extrabold text-gray-900 mb-1">
+            <p className="text-base sm:text-lg font-extrabold text-gray-900 mb-1">
               {isChairmanApproved ? 'Active' : application?.status || 'Pending Review'}
             </p>
             <p className="text-xs text-gray-500 font-medium">Your account is {isChairmanApproved ? 'fully active' : 'under review'}.</p>
@@ -135,13 +135,13 @@ export default function PortalDashboard() {
         </div>
 
         {/* Allocation Status */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-start gap-4">
-          <div className={`p-3 rounded-full shrink-0 ${isAllocated ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-            <MapPin className="w-6 h-6" />
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+          <div className={`p-2.5 sm:p-3 rounded-full shrink-0 ${isAllocated ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+            <MapPin className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Allocation</p>
-            <p className="text-lg font-extrabold text-gray-900 mb-1">
+            <p className="text-base sm:text-lg font-extrabold text-gray-900 mb-1">
               {isAllocated ? 'Allocated' : 'Pending Allocation'}
             </p>
             <p className="text-xs text-gray-500 font-medium">
@@ -151,13 +151,13 @@ export default function PortalDashboard() {
         </div>
 
         {/* Payment Status */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-start gap-4">
-          <div className={`p-3 rounded-full shrink-0 ${isPaymentUpToDate ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-            {isPaymentUpToDate ? <CheckCircle2 className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+        <div className="col-span-2 md:col-span-1 bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 shadow-sm flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+          <div className={`p-2.5 sm:p-3 rounded-full shrink-0 ${isPaymentUpToDate ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+            {isPaymentUpToDate ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" /> : <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6" />}
           </div>
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Payment Status</p>
-            <p className="text-lg font-extrabold text-gray-900 mb-1">
+            <p className="text-base sm:text-lg font-extrabold text-gray-900 mb-1">
               {isPaymentUpToDate ? 'Up To Date' : 'Overdue'}
             </p>
             <p className="text-xs text-gray-500 font-medium">
@@ -183,18 +183,18 @@ export default function PortalDashboard() {
               </span>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
                 <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Total Property Value</p>
-                  <p className="text-2xl font-extrabold text-gray-900">₦{account?.totalPropertyPrice.toLocaleString() || '0'}</p>
+                  <p className="text-xl sm:text-2xl font-extrabold text-gray-900">₦{account?.totalPropertyPrice.toLocaleString() || '0'}</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-green-50 border border-green-100">
                   <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-1">Total Paid</p>
-                  <p className="text-2xl font-extrabold text-green-700">₦{totalPaid.toLocaleString()}</p>
+                  <p className="text-xl sm:text-2xl font-extrabold text-green-700">₦{totalPaid.toLocaleString()}</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100">
+                <div className="col-span-2 md:col-span-1 p-4 rounded-2xl bg-amber-50 border border-amber-100">
                   <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">Outstanding Balance</p>
-                  <p className="text-2xl font-extrabold text-amber-700">₦{outstanding.toLocaleString()}</p>
+                  <p className="text-xl sm:text-2xl font-extrabold text-amber-700">₦{outstanding.toLocaleString()}</p>
                 </div>
               </div>
 
@@ -215,31 +215,31 @@ export default function PortalDashboard() {
           </div>
           
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link href="/portal/payments" className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:bg-green-50 group-hover:border-green-100 transition-colors">
-                  <Wallet className="w-6 h-6 text-gray-400 group-hover:text-[var(--color-primary)] transition-colors" />
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <Link href="/portal/payments" className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:bg-green-50 group-hover:border-green-100 transition-colors">
+                  <Wallet className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-[var(--color-primary)] transition-colors" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Upload Payment</h3>
-                  <p className="text-xs font-medium text-gray-500">Submit your transfer proof</p>
-                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-[var(--color-primary)] transition-colors" />
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-[var(--color-primary)] transition-colors" />
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">Upload Payment</h3>
+                <p className="text-xs font-medium text-gray-500">Submit your transfer proof</p>
+              </div>
             </Link>
-            
-            <Link href="/portal/documents" className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
-                  <FileText className="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
+
+            <Link href="/portal/documents" className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:bg-blue-50 group-hover:border-blue-100 transition-colors">
+                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">My Statements</h3>
-                  <p className="text-xs font-medium text-gray-500">View receipts and ledger</p>
-                </div>
+                <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-600 transition-colors" />
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-blue-600 transition-colors" />
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">My Statements</h3>
+                <p className="text-xs font-medium text-gray-500">View receipts and ledger</p>
+              </div>
             </Link>
           </div>
 
