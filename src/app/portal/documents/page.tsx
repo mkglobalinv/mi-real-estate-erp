@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Lock, Loader2, FolderOpen } from 'lucide-react';
+import { FileText, Download, Eye, Lock, Loader2, FolderOpen, DownloadCloud } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { toast } from 'react-hot-toast';
 
 interface DocumentRow {
   id: string;
@@ -12,9 +13,32 @@ interface DocumentRow {
   generated_date: string | null;
 }
 
+function fileExtension(url: string): string {
+  const clean = url.split('?')[0];
+  const match = clean.match(/\.([a-zA-Z0-9]+)$/);
+  return match ? match[1] : 'pdf';
+}
+
+async function downloadFile(url: string, filename: string) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Could not fetch file (${res.status})`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 export default function PortalDocuments() {
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
 
   useEffect(() => {
     async function loadDocs() {
@@ -45,6 +69,57 @@ export default function PortalDocuments() {
     loadDocs();
   }, []);
 
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const downloadableDocs = documents.filter(d => !!d.file_url);
+  const allSelected = downloadableDocs.length > 0 && selectedIds.size === downloadableDocs.length;
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(downloadableDocs.map(d => d.id)));
+  };
+
+  const handleDownload = async (doc: DocumentRow) => {
+    if (!doc.file_url) return;
+    setDownloadingId(doc.id);
+    try {
+      await downloadFile(doc.file_url, `${doc.title}.${fileExtension(doc.file_url)}`);
+    } catch (err: any) {
+      toast.error(err.message || `Failed to download ${doc.title}`);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadSelected = async () => {
+    const docs = downloadableDocs.filter(d => selectedIds.has(d.id));
+    if (docs.length === 0) return;
+    setBulkDownloading(true);
+    let failed = 0;
+    for (const doc of docs) {
+      try {
+        // Each file downloads as its own file (image stays image, PDF stays
+        // PDF) - a short stagger between each avoids the browser blocking
+        // several downloads fired at once.
+        await downloadFile(doc.file_url!, `${doc.title}.${fileExtension(doc.file_url!)}`);
+        await new Promise(r => setTimeout(r, 300));
+      } catch {
+        failed++;
+      }
+    }
+    setBulkDownloading(false);
+    if (failed > 0) {
+      toast.error(`${failed} of ${docs.length} file${docs.length !== 1 ? 's' : ''} failed to download.`);
+    } else {
+      toast.success(`Downloaded ${docs.length} file${docs.length !== 1 ? 's' : ''}.`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 flex items-center gap-3 text-gray-500">
@@ -71,17 +146,25 @@ export default function PortalDocuments() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-indigo-100 rounded-xl">
-          <FolderOpen className="w-6 h-6 text-indigo-600" />
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 pb-24">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-indigo-100 rounded-xl">
+            <FolderOpen className="w-6 h-6 text-indigo-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900">Document Center</h1>
+            <p className="text-gray-500 text-sm">
+              Secure access to all your official files.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Document Center</h1>
-          <p className="text-gray-500 text-sm">
-            Secure access to all your official files.
-          </p>
-        </div>
+        {downloadableDocs.length > 0 && (
+          <label className="flex items-center gap-2 text-xs font-bold text-gray-500 cursor-pointer">
+            <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded accent-[var(--color-primary)]" />
+            Select all
+          </label>
+        )}
       </div>
 
       {documents.length === 0 ? (
@@ -104,8 +187,16 @@ export default function PortalDocuments() {
             </div>
             <div className="divide-y divide-white/60">
               {docs.map(doc => (
-                <div key={doc.id} className="flex items-center justify-between px-6 py-3.5 bg-white/60 hover:bg-white/90 transition-colors">
+                <div key={doc.id} className="flex items-center justify-between px-6 py-3.5 bg-white/60 hover:bg-white/90 transition-colors gap-3">
                   <div className="flex items-center gap-3 min-w-0">
+                    {doc.file_url && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(doc.id)}
+                        onChange={() => toggleSelected(doc.id)}
+                        className="w-4 h-4 rounded accent-[var(--color-primary)] shrink-0"
+                      />
+                    )}
                     <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-gray-800 truncate">{doc.title}</p>
@@ -117,15 +208,25 @@ export default function PortalDocuments() {
                     </div>
                   </div>
                   {doc.file_url ? (
-                    <a
-                      href={doc.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-primary)] hover:underline flex-shrink-0 ml-4"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Download
-                    </a>
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                      <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:underline"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        View
+                      </a>
+                      <button
+                        onClick={() => handleDownload(doc)}
+                        disabled={downloadingId === doc.id}
+                        className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-primary)] hover:underline disabled:opacity-50"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {downloadingId === doc.id ? 'Downloading...' : 'Download'}
+                      </button>
+                    </div>
                   ) : (
                     <span className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0 ml-4">
                       <Lock className="w-3.5 h-3.5" />
@@ -137,6 +238,23 @@ export default function PortalDocuments() {
             </div>
           </div>
         ))
+      )}
+
+      {/* Sticky bulk-download bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.15)] p-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <p className="text-sm font-bold text-gray-700">{selectedIds.size} file{selectedIds.size !== 1 ? 's' : ''} selected</p>
+            <button
+              onClick={handleDownloadSelected}
+              disabled={bulkDownloading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--color-primary)] text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60"
+            >
+              <DownloadCloud className="w-4 h-4" />
+              {bulkDownloading ? 'Downloading...' : `Download Selected (${selectedIds.size})`}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
