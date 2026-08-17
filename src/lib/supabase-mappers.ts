@@ -706,6 +706,26 @@ export function mapAnnouncementToDb(data: any): any {
   };
 }
 
+export function mapDbToBanner(db: any): any {
+  return {
+    id: db.id, title: db.title, description: db.description, imageUrl: db.image_url,
+    clickUrl: db.click_url, isActive: db.is_active, orderIndex: db.order_index,
+    startAt: db.start_at, endAt: db.end_at, createdAt: db.created_at
+  };
+}
+export function mapBannerToDb(data: any): any {
+  return {
+    ...(data.id && { id: data.id }), ...(data.title !== undefined && { title: data.title }),
+    ...(data.description !== undefined && { description: data.description }),
+    ...(data.imageUrl && { image_url: data.imageUrl }),
+    ...(data.clickUrl !== undefined && { click_url: data.clickUrl }),
+    ...(data.isActive !== undefined && { is_active: data.isActive }),
+    ...(data.orderIndex !== undefined && { order_index: data.orderIndex }),
+    ...(data.startAt !== undefined && { start_at: data.startAt || null }),
+    ...(data.endAt !== undefined && { end_at: data.endAt || null })
+  };
+}
+
 export function mapDbToTestimonial(db: any): any {
   return {
     id: db.id, customerName: db.customer_name, content: db.content, rating: db.rating,

@@ -81,6 +81,21 @@ export interface Announcement extends BaseRolePrep {
   createdAt: string;
 }
 
+// Customer portal dashboard promo slider. Purely promotional/click-through —
+// unrelated to campaigns (lead capture) or announcements (text ticker).
+export interface Banner {
+  id: string;
+  title?: string;
+  description?: string;
+  imageUrl: string;
+  clickUrl?: string;
+  isActive: boolean;
+  orderIndex: number;
+  startAt?: string;
+  endAt?: string;
+  createdAt: string;
+}
+
 export interface Project extends BaseRolePrep {
   id: string;
   name: string;

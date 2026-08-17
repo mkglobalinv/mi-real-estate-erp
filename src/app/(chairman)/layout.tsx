@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  Building2, LayoutDashboard, Users, MapPin, PlusCircle, 
+  Building2, LayoutDashboard, Users, MapPin, PlusCircle,
   Settings, Activity, Calendar, Wallet, CheckSquare, FolderGit2,
-  Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone
+  Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone,
+  Image as ImageIcon
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
@@ -115,6 +116,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <Link href="/chairman/campaigns" onClick={closeMenu} className={linkClass('/chairman/campaigns')}>
               <Megaphone className={iconClass('/chairman/campaigns')} />
               Campaign Manager
+            </Link>
+            <Link href="/chairman/banners" onClick={closeMenu} className={linkClass('/chairman/banners')}>
+              <ImageIcon className={iconClass('/chairman/banners')} />
+              Promo Banners
             </Link>
 
             {/* PORTFOLIO */}

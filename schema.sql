@@ -676,3 +676,60 @@ CREATE POLICY "locations_select_all" ON public.locations
   FOR SELECT
   TO anon, authenticated
   USING (true);
+
+-- 32. PROMOTIONAL BANNERS (Customer Portal Dashboard Slider)
+-- Chairman/Admin-managed promo slides shown on the customer portal
+-- dashboard. Purely a marketing click-through — unrelated to campaigns
+-- (lead-capture landing pages) or announcements (public-site news ticker).
+-- Scheduling is optional: a NULL start_at/end_at means "no bound" on that
+-- side, so an always-on banner just needs is_active = true. RLS is enabled
+-- from the start (public SELECT + authenticated write), matching this
+-- schema's established posture and avoiding the silently-empty-read bug
+-- documented above for projects/campaign_questions/locations.
+CREATE TABLE IF NOT EXISTS public.banners (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT,
+    description TEXT,
+    image_url TEXT NOT NULL,
+    click_url TEXT,
+    is_active BOOLEAN DEFAULT true,
+    order_index INTEGER DEFAULT 0,
+    start_at TIMESTAMP WITH TIME ZONE,
+    end_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Public storage bucket for banner images, uploaded from the Chairman/Admin
+-- banner manager (mirrors how the existing "payment-proofs" bucket is
+-- referenced by src/features/payments/page.tsx, just public since these are
+-- promotional images, not customer documents).
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('banners', 'banners', true)
+ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "banners_select_all" ON public.banners;
+CREATE POLICY "banners_select_all" ON public.banners
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "banners_insert_authenticated" ON public.banners;
+CREATE POLICY "banners_insert_authenticated" ON public.banners
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "banners_update_authenticated" ON public.banners;
+CREATE POLICY "banners_update_authenticated" ON public.banners
+  FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "banners_delete_authenticated" ON public.banners;
+CREATE POLICY "banners_delete_authenticated" ON public.banners
+  FOR DELETE
+  TO authenticated
+  USING (true);
