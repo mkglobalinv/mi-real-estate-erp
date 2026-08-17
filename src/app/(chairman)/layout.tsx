@@ -134,6 +134,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               <Users className={iconClass('/chairman/customers')} />
               Customer Profiles
             </Link>
+            <Link href="/chairman/allocations" onClick={closeMenu} className={linkClass('/chairman/allocations')}>
+              <MapPin className={iconClass('/chairman/allocations')} />
+              Allocations
+            </Link>
             <Link href="/chairman/reports" onClick={closeMenu} className={linkClass('/chairman/reports')}>
               <Activity className={iconClass('/chairman/reports')} />
               Executive Reports

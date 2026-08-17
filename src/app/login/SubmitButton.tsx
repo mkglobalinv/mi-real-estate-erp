@@ -13,6 +13,12 @@ export function SubmitButton() {
     } else {
       toast.dismiss('login-toast');
     }
+    // On successful login the server action redirects immediately, which
+    // unmounts this component before `pending` ever transitions back to
+    // false - so the dismiss above never runs, and the toast (a global
+    // singleton that survives navigation) stays stuck on screen on every
+    // page afterward. Dismissing on unmount covers that case too.
+    return () => toast.dismiss('login-toast');
   }, [pending]);
 
   return (
