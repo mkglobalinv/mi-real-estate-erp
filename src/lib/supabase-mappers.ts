@@ -149,6 +149,7 @@ export function mapDbToEasyBuyAccount(db: any): EasyBuyAccount {
     startDate: db.start_date,
     endDate: db.end_date,
     outstandingBalance: Number(db.outstanding_balance),
+    amountPaid: Number(db.amount_paid || 0),
     createdAt: db.created_at
   };
 }
@@ -167,6 +168,7 @@ export function mapEasyBuyAccountToDb(acc: Partial<EasyBuyAccount>): any {
     ...(acc.startDate && { start_date: acc.startDate }),
     ...(acc.endDate && { end_date: acc.endDate }),
     ...(acc.outstandingBalance !== undefined && { outstanding_balance: acc.outstandingBalance }),
+    ...(acc.amountPaid !== undefined && { amount_paid: acc.amountPaid }),
     ...(acc.status && { status: acc.status })
   };
 }

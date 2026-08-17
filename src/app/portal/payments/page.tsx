@@ -1,26 +1,43 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Wallet, UploadCloud, CheckCircle2, AlertCircle,
-  Clock, ChevronRight
+  Clock, ChevronRight, XCircle
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import { api } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 interface Installment {
   id: string;
-  installment_number: number;
+  month_number: number;
   amount: number;
   due_date: string;
   status: string;
   paid_date: string | null;
 }
 
+// Latest payment_proofs submission per installment (keyed by month_number,
+// 0 = Initial Deposit), used to show submission status on the Timeline
+// without touching the installment's own status until Secretary approval.
+interface ProofState {
+  status: string;
+  reason?: string;
+}
+
+function parseAppliedTo(appliedTo: string): number | null {
+  if (appliedTo === 'Initial Deposit') return 0;
+  const match = appliedTo.match(/^Month (\d+)$/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 export default function PortalPayments() {
   const [activeTab, setActiveTab] = useState<'timeline' | 'upload'>('timeline');
   const [installments, setInstallments] = useState<Installment[]>([]);
+  const [proofsByMonth, setProofsByMonth] = useState<Record<number, ProofState>>({});
   const [loading, setLoading] = useState(true);
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [totalBalance, setTotalBalance] = useState(0);
 
@@ -34,87 +51,119 @@ export default function PortalPayments() {
     file: null as File | null,
   });
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.email) { setLoading(false); return; }
+  const loadData = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) { setLoading(false); return; }
 
-        // 1. Find customer by email
-        const { data: customer } = await supabase
-          .from('customers').select('id').eq('email', user.email).maybeSingle();
-        if (!customer) { setLoading(false); return; }
+      // 1. Find customer by email
+      const { data: customer } = await supabase
+        .from('customers').select('id').eq('email', user.email).maybeSingle();
+      if (!customer) { setLoading(false); return; }
+      setCustomerId(customer.id);
 
-        // 2. Find Easy Buy account
-        const { data: account } = await supabase
-          .from('easy_buy_accounts').select('id, total_amount, amount_paid')
-          .eq('customer_id', customer.id).maybeSingle();
-        if (!account) { setLoading(false); return; }
+      // 2. Find Easy Buy account
+      const { data: account } = await supabase
+        .from('easy_buy_accounts').select('id, total_amount, amount_paid')
+        .eq('customer_id', customer.id).maybeSingle();
+      if (!account) { setLoading(false); return; }
 
-        setAccountId(account.id);
-        setTotalBalance((account.total_amount ?? 0) - (account.amount_paid ?? 0));
+      setAccountId(account.id);
+      setTotalBalance((account.total_amount ?? 0) - (account.amount_paid ?? 0));
 
-        // 3. Load installments
-        const { data: insts } = await supabase
-          .from('installments')
-          .select('id, installment_number, amount, due_date, status, paid_date')
-          .eq('account_id', account.id)
-          .order('installment_number', { ascending: true });
+      // 3. Load installments
+      const { data: insts } = await supabase
+        .from('installments')
+        .select('id, month_number, amount, due_date, status, paid_date')
+        .eq('account_id', account.id)
+        .order('month_number', { ascending: true });
 
-        setInstallments(insts ?? []);
-      } catch (err: unknown) {
-        console.error('Failed to load payments', err);
-      } finally {
-        setLoading(false);
+      setInstallments(insts ?? []);
+
+      // 4. Load this account's payment submissions, so the Timeline can show
+      // "Pending Verification" / "Rejected" without changing installment status.
+      const { data: proofs } = await supabase
+        .from('payment_proofs')
+        .select('applied_to, status, notes, created_at')
+        .eq('account_id', account.id)
+        .order('created_at', { ascending: false });
+
+      const byMonth: Record<number, ProofState> = {};
+      for (const p of proofs ?? []) {
+        const month = parseAppliedTo(p.applied_to);
+        if (month === null) continue;
+        // Keep only the latest submission per installment (list is already
+        // newest-first), so a resubmission after a rejection takes over.
+        if (!(month in byMonth)) {
+          byMonth[month] = { status: p.status, reason: p.notes ?? undefined };
+        }
       }
+      setProofsByMonth(byMonth);
+    } catch (err: unknown) {
+      console.error('Failed to load payments', err);
+    } finally {
+      setLoading(false);
     }
-    loadData();
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!accountId || !uploadForm.installmentId || !uploadForm.amount) {
+    if (!accountId || !customerId || !uploadForm.installmentId || !uploadForm.amount || !uploadForm.date) {
       toast.error('Please fill in all required fields.');
       return;
     }
+    if (!uploadForm.file) {
+      toast.error('Please upload your payment proof (JPEG, PNG or PDF).');
+      return;
+    }
+    const installment = installments.find(i => i.id === uploadForm.installmentId);
+    if (!installment) {
+      toast.error('Selected installment could not be found. Please refresh and try again.');
+      return;
+    }
+
     setUploading(true);
     try {
       const supabase = createClient();
-      let fileUrl = '';
 
-      // Upload file to Supabase Storage if present
-      if (uploadForm.file) {
-        const ext = uploadForm.file.name.split('.').pop();
-        const fileName = `proof_${Date.now()}.${ext}`;
-        const { error: storageError } = await supabase.storage
-          .from('payment-proofs')
-          .upload(fileName, uploadForm.file);
-        if (storageError) {
-          console.warn('Storage upload failed:', storageError.message);
-        } else {
-          const { data: urlData } = supabase.storage
-            .from('payment-proofs').getPublicUrl(fileName);
-          fileUrl = urlData?.publicUrl ?? '';
-        }
+      // Upload file to Supabase Storage (required - proof_image_url is NOT NULL)
+      const ext = uploadForm.file.name.split('.').pop();
+      const fileName = `${customerId}/proof_${Date.now()}.${ext}`;
+      const { error: storageError } = await supabase.storage
+        .from('payment-proofs')
+        .upload(fileName, uploadForm.file);
+      if (storageError) {
+        throw new Error(`Failed to upload proof: ${storageError.message}`);
+      }
+      const { data: urlData } = supabase.storage
+        .from('payment-proofs').getPublicUrl(fileName);
+      const fileUrl = urlData?.publicUrl ?? '';
+      if (!fileUrl) {
+        throw new Error('Failed to generate a URL for the uploaded proof.');
       }
 
-      // Insert payment proof record
-      const { error } = await supabase.from('payment_proofs').insert({
-        account_id: accountId,
-        installment_id: uploadForm.installmentId,
+      const appliedTo = installment.month_number === 0 ? 'Initial Deposit' : `Month ${installment.month_number}`;
+
+      await api.savePaymentProof({
+        customerId,
+        accountId,
         amount: parseFloat(uploadForm.amount),
-        payment_date: uploadForm.date || new Date().toISOString(),
-        bank_reference: uploadForm.reference,
-        file_url: fileUrl,
+        paymentDate: uploadForm.date,
+        referenceNumber: uploadForm.reference,
+        proofImageUrl: fileUrl,
+        appliedTo,
         status: 'Pending Verification',
       });
-
-      if (error) throw new Error(error.message);
 
       toast.success('Payment proof submitted! It will be verified within 24 hours.');
       setUploadForm({ installmentId: '', amount: '', date: '', reference: '', file: null });
       setActiveTab('timeline');
+      await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
       toast.error(msg);
@@ -126,12 +175,14 @@ export default function PortalPayments() {
   const statusIcon = (status: string) => {
     if (status === 'Paid') return <CheckCircle2 className="w-4 h-4 text-green-500" />;
     if (status === 'Pending Verification') return <Clock className="w-4 h-4 text-amber-500" />;
+    if (status === 'Rejected') return <XCircle className="w-4 h-4 text-red-500" />;
     return <AlertCircle className="w-4 h-4 text-gray-400" />;
   };
 
   const statusClass = (status: string) => {
     if (status === 'Paid') return 'text-green-700 bg-green-100';
     if (status === 'Pending Verification') return 'text-amber-700 bg-amber-100';
+    if (status === 'Rejected') return 'text-red-700 bg-red-100';
     if (status === 'Overdue') return 'text-red-700 bg-red-100';
     return 'text-gray-600 bg-gray-100';
   };
@@ -145,8 +196,10 @@ export default function PortalPayments() {
     );
   }
 
+  // An installment already has a submission pending/rejected if its most
+  // recent proof isn't superseded by the installment itself being Paid.
   const pendingInstallments = installments.filter(
-    i => i.status !== 'Paid'
+    i => i.status !== 'Paid' && proofsByMonth[i.month_number]?.status !== 'Pending Verification'
   );
 
   return (
@@ -207,24 +260,31 @@ export default function PortalPayments() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {installments.map((inst) => (
-                    <tr key={inst.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-bold text-gray-800">
-                        {inst.installment_number === 0 ? 'Initial Deposit' : `Installment ${inst.installment_number}`}
-                      </td>
-                      <td className="p-4 text-gray-600 text-sm">{inst.due_date}</td>
-                      <td className="p-4 font-bold text-gray-900">₦{Number(inst.amount).toLocaleString()}</td>
-                      <td className="p-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${statusClass(inst.status)}`}>
-                          {statusIcon(inst.status)}
-                          {inst.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-gray-500 text-sm">
-                        {inst.paid_date ? new Date(inst.paid_date).toLocaleDateString() : '—'}
-                      </td>
-                    </tr>
-                  ))}
+                  {installments.map((inst) => {
+                    const proof = proofsByMonth[inst.month_number];
+                    const displayStatus = inst.status === 'Paid' ? 'Paid' : (proof?.status || inst.status);
+                    return (
+                      <tr key={inst.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="p-4 font-bold text-gray-800">
+                          {inst.month_number === 0 ? 'Initial Deposit' : `Installment ${inst.month_number}`}
+                        </td>
+                        <td className="p-4 text-gray-600 text-sm">{inst.due_date}</td>
+                        <td className="p-4 font-bold text-gray-900">₦{Number(inst.amount).toLocaleString()}</td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${statusClass(displayStatus)}`}>
+                            {statusIcon(displayStatus)}
+                            {displayStatus}
+                          </span>
+                          {displayStatus === 'Rejected' && proof?.reason && (
+                            <p className="text-xs text-red-500 font-medium mt-1 max-w-xs">{proof.reason}</p>
+                          )}
+                        </td>
+                        <td className="p-4 text-gray-500 text-sm">
+                          {inst.paid_date ? new Date(inst.paid_date).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -252,11 +312,14 @@ export default function PortalPayments() {
                 <option value="">Select installment...</option>
                 {pendingInstallments.map(inst => (
                   <option key={inst.id} value={inst.id}>
-                    {inst.installment_number === 0 ? 'Initial Deposit' : `Installment ${inst.installment_number}`}
+                    {inst.month_number === 0 ? 'Initial Deposit' : `Installment ${inst.month_number}`}
                     {' '} — ₦{Number(inst.amount).toLocaleString()} (Due: {inst.due_date})
                   </option>
                 ))}
               </select>
+              {pendingInstallments.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1.5">No installments are currently awaiting payment.</p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -274,8 +337,11 @@ export default function PortalPayments() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1.5">Date of Payment</label>
+                <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                  Date of Payment <span className="text-red-500">*</span>
+                </label>
                 <input
+                  required
                   type="date"
                   value={uploadForm.date}
                   onChange={e => setUploadForm(f => ({ ...f, date: e.target.value }))}
@@ -297,7 +363,7 @@ export default function PortalPayments() {
 
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1.5">
-                Upload Screenshot (JPEG, PNG, PDF)
+                Upload Payment Proof (JPEG, PNG or PDF) <span className="text-red-500">*</span>
               </label>
               <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-[var(--color-primary)] transition-colors bg-gray-50">
                 <UploadCloud className="w-7 h-7 text-gray-400 mb-1" />

@@ -437,6 +437,7 @@ export interface EasyBuyAccount extends BaseRolePrep {
   startDate: string;
   endDate: string;
   outstandingBalance: number;
+  amountPaid?: number;
   status: 'Active' | 'Completed' | 'Suspended' | 'Defaulting' | 'Cancelled';
   createdAt: string;
 }
@@ -461,7 +462,10 @@ export interface PaymentProof extends BaseRolePrep {
   referenceNumber: string;
   proofImageUrl: string;
   notes?: string;
-  appliedTo: 'Initial Deposit' | 'Month 1' | 'Month 2' | 'Month 3' | 'Custom';
+  // e.g. 'Initial Deposit' or 'Month <installmentNumber>' - identifies which
+  // installment this payment is for. Not a strict enum since installment
+  // periods vary in length; payment_proofs.applied_to has no DB constraint.
+  appliedTo: string;
   status: 'Pending Verification' | 'Verified' | 'Rejected';
   createdAt: string;
 }
