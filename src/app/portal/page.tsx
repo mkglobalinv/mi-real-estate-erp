@@ -9,6 +9,7 @@ import Link from 'next/link';
 
 import { createClient } from '@/utils/supabase/client';
 import { Customer, Application, Allocation, EasyBuyAccount, Installment, Project } from '@/lib/types';
+import BannerSlider from '@/components/BannerSlider';
 
 export default function PortalDashboard() {
   const [mounted, setMounted] = useState(false);
@@ -167,8 +168,11 @@ export default function PortalDashboard() {
         </div>
       </div>
 
+      {/* Promo Banner Slider */}
+      <BannerSlider />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         {/* Left Column - Financial Summary */}
         <div className="lg:col-span-2 space-y-8">
           
