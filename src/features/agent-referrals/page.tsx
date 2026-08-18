@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { AgentReferral, Customer } from '@/lib/types';
 import { createClient } from '@/utils/supabase/client';
-import { Users, CheckCircle, XCircle, AlertTriangle, MapPin } from 'lucide-react';
+import { Users, CheckCircle, XCircle, AlertTriangle, MapPin, SearchCheck, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type Tab = 'Submitted' | 'Accepted' | 'Rejected';
@@ -118,9 +119,17 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
                     <td className="p-4">
                       <p className="font-bold text-gray-900">{r.customerName}</p>
                       <p className="text-xs text-gray-500">{r.customerPhone}</p>
-                      {duplicate && (
-                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                          <AlertTriangle className="w-3 h-3" /> Possible existing customer ({duplicate.ref})
+                      {duplicate ? (
+                        <Link
+                          href={`${basePath}/customers/${duplicate.id}`}
+                          target="_blank"
+                          className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors"
+                        >
+                          <AlertTriangle className="w-3 h-3" /> Existing customer ({duplicate.ref}) — Audit <SearchCheck className="w-3 h-3" />
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                          <UserPlus className="w-3 h-3" /> No existing record — new customer
                         </span>
                       )}
                       {r.note && <p className="text-xs text-gray-400 mt-1 italic">&quot;{r.note}&quot;</p>}
