@@ -7,17 +7,17 @@ import LogoutButton from '@/components/LogoutButton';
 import UserMenu from '@/components/UserMenu';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
 import {
-  Building2, LayoutDashboard, PlusCircle, Users,
+  Building2, LayoutDashboard, PlusCircle, Users, Wallet,
   Menu, X, Bell, ChevronRight
 } from 'lucide-react';
 
-// Nav items grow one phase at a time — My Earnings / My Profile are added
-// here as their routes ship, so the sidebar never links to a page that
-// doesn't exist yet.
+// Nav items grow one phase at a time — My Profile is added here once its
+// route ships, so the sidebar never links to a page that doesn't exist yet.
 const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard }[] = [
   { href: '/agent', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/agent/add-customer', label: 'Add Customer', icon: PlusCircle },
   { href: '/agent/referrals', label: 'My Referrals', icon: Users },
+  { href: '/agent/earnings', label: 'My Earnings', icon: Wallet },
 ];
 
 function AgentLayoutContent({

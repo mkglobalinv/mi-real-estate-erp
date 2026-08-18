@@ -134,6 +134,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               <Banknote className={iconClass('/chairman/commission-rules')} />
               Commission Rules
             </Link>
+            <Link href="/chairman/commission-payments" onClick={closeMenu} className={linkClass('/chairman/commission-payments')}>
+              <CheckSquare className={iconClass('/chairman/commission-payments')} />
+              Commission Payments
+            </Link>
 
             {/* PORTFOLIO */}
             <div className="pt-6 pb-1 px-4">
