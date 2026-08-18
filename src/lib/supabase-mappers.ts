@@ -739,7 +739,7 @@ export function mapDbToAgentReferral(db: any): any {
     agentSerial: db.agents?.agent_serial, agentName: db.agents?.full_name,
     customerName: db.customer_name, customerPhone: db.customer_phone,
     estateLocation: db.estate_location, plotSize: db.plot_size, note: db.note,
-    status: db.status, rejectionReason: db.rejection_reason,
+    source: db.source, status: db.status, rejectionReason: db.rejection_reason,
     reviewedBy: db.reviewed_by, reviewedAt: db.reviewed_at,
     customerId: db.customer_id, createdAt: db.created_at
   };
@@ -753,6 +753,7 @@ export function mapAgentReferralToDb(data: any): any {
     ...(data.estateLocation && { estate_location: data.estateLocation }),
     ...(data.plotSize && { plot_size: data.plotSize }),
     ...(data.note !== undefined && { note: data.note }),
+    ...(data.source && { source: data.source }),
     ...(data.status && { status: data.status }),
     ...(data.rejectionReason !== undefined && { rejection_reason: data.rejectionReason }),
     ...(data.reviewedBy !== undefined && { reviewed_by: data.reviewedBy }),

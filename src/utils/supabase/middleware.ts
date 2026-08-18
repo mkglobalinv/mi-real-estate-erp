@@ -42,6 +42,7 @@ export async function updateSession(request: NextRequest) {
                        pathname === '/about' ||
                        pathname === '/projects' ||
                        pathname === '/become-an-agent' ||
+                       pathname.startsWith('/r/') ||
                        pathname === '/favicon.ico'
 
   if (!user && !isPublicPath) {

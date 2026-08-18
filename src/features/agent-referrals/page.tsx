@@ -110,6 +110,9 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
                     <td className="p-4">
                       <p className="font-mono text-xs font-bold text-gray-900">{r.agentSerial}</p>
                       <p className="text-xs text-gray-500">{r.agentName}</p>
+                      {r.source === 'Referral Link' && (
+                        <span className="inline-block mt-1 text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">via Referral Link</span>
+                      )}
                     </td>
                     <td className="p-4">
                       <p className="font-bold text-gray-900">{r.customerName}</p>

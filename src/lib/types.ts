@@ -457,6 +457,7 @@ export interface AgentReferral {
   estateLocation: string;
   plotSize: string;
   note?: string;
+  source: 'Agent Portal' | 'Referral Link';
   status: 'Submitted' | 'Under Review' | 'Accepted' | 'Rejected';
   rejectionReason?: string;
   reviewedBy?: string;
