@@ -38,8 +38,13 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      await api.acceptReferral(referral.id, user.id);
-      toast.success(`${referral.customerName} accepted into the customer workflow.`);
+      const accepted = await api.acceptReferral(referral.id, user.id);
+      if (accepted.commissionAmount) {
+        toast.success(`${referral.customerName} accepted. Commission of ₦${accepted.commissionAmount.toLocaleString()} is now payable by the Chairman.`);
+      } else {
+        toast.success(`${referral.customerName} accepted into the customer workflow.`);
+        if (accepted.commissionError) toast.error(accepted.commissionError, { duration: 8000 });
+      }
       loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to accept referral');
