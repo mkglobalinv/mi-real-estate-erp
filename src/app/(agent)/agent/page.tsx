@@ -121,8 +121,8 @@ export default function AgentDashboard() {
             <XCircle className="w-6 h-6" />
           </div>
           <div>
-            <p className="font-extrabold text-gray-900 mb-1">Application Rejected</p>
-            <p className="text-sm text-gray-500">{agent.rejectionReason || 'No reason was provided.'}</p>
+            <p className="font-extrabold text-gray-900 mb-1">Account Deactivated</p>
+            <p className="text-sm text-gray-500">{agent.rejectionReason || 'No reason was provided.'} Contact M.I. Real Estate if you believe this is a mistake.</p>
           </div>
         </div>
       )}

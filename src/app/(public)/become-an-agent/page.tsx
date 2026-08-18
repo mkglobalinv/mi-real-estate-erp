@@ -44,10 +44,10 @@ export default function BecomeAnAgentPage() {
             <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-9 h-9 text-[var(--color-primary)]" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">You&apos;re In</h2>
             <p className="text-gray-600 mb-1">Your Agent ID:</p>
             <p className="text-2xl font-extrabold text-[var(--color-primary)] mb-6">{agentSerial}</p>
-            <p className="text-gray-600 mb-8">Your application is pending Chairman approval. You&apos;ll be able to sign in and start submitting customer referrals once approved.</p>
+            <p className="text-gray-600 mb-8">Your account is active. Sign in now to get your referral link and start submitting customers.</p>
             <Link href="/login" className="btn-primary inline-block px-8 py-3">Go to Sign In</Link>
           </div>
         </div>
