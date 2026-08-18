@@ -766,3 +766,243 @@ CREATE POLICY "banners_bucket_delete" ON storage.objects
   FOR DELETE
   TO authenticated
   USING (bucket_id = 'banners');
+
+-- ============================================================================
+-- 34. AGENT PORTAL V1 — PHASE 1 FOUNDATION
+-- Purely additive: one new allowed value on profiles.role, four new tables,
+-- one new storage bucket. No existing table, column, row, or constraint
+-- value is altered or removed. Reversible by dropping the four new tables/
+-- bucket and re-running the previous CHECK constraint definition.
+--
+-- Unlike every other RLS-enabled table in this schema (public SELECT +
+-- authenticated write, authorization left to the application layer), the
+-- tables below hold agent PII, bank details, and commission money — so they
+-- use real per-row ownership/role RLS instead of the blanket-authenticated
+-- posture used elsewhere. This is a deliberate, reviewed departure: see the
+-- approved Agent Portal plan, section 3.7.
+-- ============================================================================
+
+-- 34.1 Allow the new 'Agent' role. Existing role values are untouched; this
+-- only widens the set the constraint accepts.
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
+  CHECK (role IN ('Chairman', 'Director', 'Secretary', 'Customer Care',
+                  'Admin Engineer', 'Social Media Director', 'Customer',
+                  'Super Admin', 'Agent'));
+
+-- 34.2 AGENTS
+-- Mirrors the existing customers.profile_id pattern: one row per Agent
+-- portal account, linked 1:1 to its auth/profiles identity.
+CREATE TABLE IF NOT EXISTS public.agents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID UNIQUE REFERENCES public.profiles(id) ON DELETE CASCADE,
+    agent_serial TEXT UNIQUE NOT NULL, -- e.g. "MI-AG-000125", generated app-side
+    full_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    bank_name TEXT NOT NULL,
+    account_number TEXT NOT NULL,
+    account_name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Rejected')),
+    rejection_reason TEXT,
+    approved_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 34.3 AGENT REFERRALS
+-- Accepting a referral creates a real customers + applications row via the
+-- existing, unmodified api.saveCustomer / api.saveApplication functions —
+-- this table never becomes a parallel customer record.
+CREATE TABLE IF NOT EXISTS public.agent_referrals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ref TEXT UNIQUE NOT NULL,
+    agent_id UUID NOT NULL REFERENCES public.agents(id) ON DELETE RESTRICT,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    estate_location TEXT NOT NULL,
+    plot_size TEXT NOT NULL,
+    note TEXT,
+    status TEXT NOT NULL DEFAULT 'Submitted' CHECK (status IN ('Submitted', 'Under Review', 'Accepted', 'Rejected')),
+    rejection_reason TEXT,
+    reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL, -- set only on Accept
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Only one open referral per phone number at a time. A rejected referral
+-- frees the number up again for a fresh submission.
+CREATE UNIQUE INDEX IF NOT EXISTS agent_referrals_open_phone_uidx
+  ON public.agent_referrals (customer_phone)
+  WHERE status IN ('Submitted', 'Under Review');
+
+-- 34.4 AGENT COMMISSION RULES
+-- Chairman-configured. Commission amounts are never hard-coded into
+-- application code — this table is the single source of truth.
+CREATE TABLE IF NOT EXISTS public.agent_commission_rules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    label TEXT NOT NULL, -- e.g. "40x40"
+    reference_property_value NUMERIC,
+    reference_initial_deposit NUMERIC,
+    commission_amount NUMERIC NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 34.5 AGENT COMMISSIONS
+-- commission_amount is a snapshot taken at eligibility-confirmation time,
+-- not a live join to agent_commission_rules, so a later rule edit never
+-- retroactively changes an already-recorded commission.
+CREATE TABLE IF NOT EXISTS public.agent_commissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    agent_id UUID NOT NULL REFERENCES public.agents(id) ON DELETE RESTRICT,
+    referral_id UUID NOT NULL REFERENCES public.agent_referrals(id) ON DELETE RESTRICT,
+    customer_id UUID NOT NULL REFERENCES public.customers(id) ON DELETE RESTRICT,
+    account_id UUID REFERENCES public.easy_buy_accounts(id) ON DELETE SET NULL,
+    commission_rule_id UUID REFERENCES public.agent_commission_rules(id) ON DELETE SET NULL,
+    commission_amount NUMERIC NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pending Eligibility' CHECK (status IN ('Pending Eligibility', 'Pending Chairman Payment', 'Paid')),
+    eligibility_confirmed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    eligibility_confirmed_at TIMESTAMP WITH TIME ZONE,
+    paid_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    paid_at TIMESTAMP WITH TIME ZONE,
+    payment_reference TEXT,
+    receipt_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 34.6 Private storage bucket for commission payment receipts. Unlike the
+-- public "banners" bucket, this holds financial records — not public.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('agent-commission-receipts', 'agent-commission-receipts', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- 34.7 Row-Level Security — real per-row ownership, not blanket-authenticated.
+-- An Agent's own row is reached via agents.profile_id = auth.uid(); staff
+-- access is a role check against profiles.role. Nothing here is
+-- anon-readable — this is PII and money, unlike the public-facing content
+-- (banners, campaigns, projects) elsewhere in this schema.
+
+ALTER TABLE public.agents ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "agents_select_own_or_staff" ON public.agents;
+CREATE POLICY "agents_select_own_or_staff" ON public.agents
+  FOR SELECT
+  TO authenticated
+  USING (
+    profile_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin'))
+  );
+
+DROP POLICY IF EXISTS "agents_insert_self_registration" ON public.agents;
+CREATE POLICY "agents_insert_self_registration" ON public.agents
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (profile_id = auth.uid());
+
+DROP POLICY IF EXISTS "agents_update_staff_only" ON public.agents;
+CREATE POLICY "agents_update_staff_only" ON public.agents
+  FOR UPDATE
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')));
+
+ALTER TABLE public.agent_referrals ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "agent_referrals_select_own_or_staff" ON public.agent_referrals;
+CREATE POLICY "agent_referrals_select_own_or_staff" ON public.agent_referrals
+  FOR SELECT
+  TO authenticated
+  USING (
+    agent_id IN (SELECT id FROM public.agents WHERE profile_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin'))
+  );
+
+DROP POLICY IF EXISTS "agent_referrals_insert_own" ON public.agent_referrals;
+CREATE POLICY "agent_referrals_insert_own" ON public.agent_referrals
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (agent_id IN (SELECT id FROM public.agents WHERE profile_id = auth.uid() AND status = 'Approved'));
+
+DROP POLICY IF EXISTS "agent_referrals_update_staff_only" ON public.agent_referrals;
+CREATE POLICY "agent_referrals_update_staff_only" ON public.agent_referrals
+  FOR UPDATE
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')));
+
+ALTER TABLE public.agent_commission_rules ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "agent_commission_rules_select_active" ON public.agent_commission_rules;
+CREATE POLICY "agent_commission_rules_select_active" ON public.agent_commission_rules
+  FOR SELECT
+  TO authenticated
+  USING (is_active = true);
+
+DROP POLICY IF EXISTS "agent_commission_rules_select_staff_all" ON public.agent_commission_rules;
+CREATE POLICY "agent_commission_rules_select_staff_all" ON public.agent_commission_rules
+  FOR SELECT
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')));
+
+DROP POLICY IF EXISTS "agent_commission_rules_insert_staff_only" ON public.agent_commission_rules;
+CREATE POLICY "agent_commission_rules_insert_staff_only" ON public.agent_commission_rules
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')));
+
+DROP POLICY IF EXISTS "agent_commission_rules_update_staff_only" ON public.agent_commission_rules;
+CREATE POLICY "agent_commission_rules_update_staff_only" ON public.agent_commission_rules
+  FOR UPDATE
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')));
+
+ALTER TABLE public.agent_commissions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "agent_commissions_select_own_or_staff" ON public.agent_commissions;
+CREATE POLICY "agent_commissions_select_own_or_staff" ON public.agent_commissions
+  FOR SELECT
+  TO authenticated
+  USING (
+    agent_id IN (SELECT id FROM public.agents WHERE profile_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin'))
+  );
+
+DROP POLICY IF EXISTS "agent_commissions_insert_staff_only" ON public.agent_commissions;
+CREATE POLICY "agent_commissions_insert_staff_only" ON public.agent_commissions
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')));
+
+DROP POLICY IF EXISTS "agent_commissions_update_staff_only" ON public.agent_commissions;
+CREATE POLICY "agent_commissions_update_staff_only" ON public.agent_commissions
+  FOR UPDATE
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')));
+
+-- Bucket-scoped storage policies: only Chairman/Super Admin can upload or
+-- read commission receipts directly. Agent-facing receipt viewing is
+-- deferred to Phase 5, where it is served via a server-side signed URL
+-- (service-role key, like the existing create-customer-account route)
+-- rather than a broad client-side RLS grant on this bucket.
+DROP POLICY IF EXISTS "agent_receipts_select_staff" ON storage.objects;
+CREATE POLICY "agent_receipts_select_staff" ON storage.objects
+  FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'agent-commission-receipts'
+    AND EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin'))
+  );
+
+DROP POLICY IF EXISTS "agent_receipts_insert_staff" ON storage.objects;
+CREATE POLICY "agent_receipts_insert_staff" ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'agent-commission-receipts'
+    AND EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin'))
+  );
