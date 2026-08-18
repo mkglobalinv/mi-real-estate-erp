@@ -730,6 +730,37 @@ export function mapAgentToDb(data: any): any {
   };
 }
 
+// `db.agents` is the optional nested join (`agents(agent_serial, full_name)`)
+// used by the Secretary review list — absent when reading an Agent's own
+// referrals, where the agent context is already known.
+export function mapDbToAgentReferral(db: any): any {
+  return {
+    id: db.id, ref: db.ref, agentId: db.agent_id,
+    agentSerial: db.agents?.agent_serial, agentName: db.agents?.full_name,
+    customerName: db.customer_name, customerPhone: db.customer_phone,
+    estateLocation: db.estate_location, plotSize: db.plot_size, note: db.note,
+    status: db.status, rejectionReason: db.rejection_reason,
+    reviewedBy: db.reviewed_by, reviewedAt: db.reviewed_at,
+    customerId: db.customer_id, createdAt: db.created_at
+  };
+}
+export function mapAgentReferralToDb(data: any): any {
+  return {
+    ...(data.id && { id: data.id }), ...(data.ref && { ref: data.ref }),
+    ...(data.agentId && { agent_id: data.agentId }),
+    ...(data.customerName && { customer_name: data.customerName }),
+    ...(data.customerPhone && { customer_phone: data.customerPhone }),
+    ...(data.estateLocation && { estate_location: data.estateLocation }),
+    ...(data.plotSize && { plot_size: data.plotSize }),
+    ...(data.note !== undefined && { note: data.note }),
+    ...(data.status && { status: data.status }),
+    ...(data.rejectionReason !== undefined && { rejection_reason: data.rejectionReason }),
+    ...(data.reviewedBy !== undefined && { reviewed_by: data.reviewedBy }),
+    ...(data.reviewedAt !== undefined && { reviewed_at: data.reviewedAt }),
+    ...(data.customerId !== undefined && { customer_id: data.customerId })
+  };
+}
+
 export function mapDbToBanner(db: any): any {
   return {
     id: db.id, title: db.title, description: db.description, imageUrl: db.image_url,

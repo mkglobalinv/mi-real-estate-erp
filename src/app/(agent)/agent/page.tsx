@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Agent } from '@/lib/types';
-import { Clock, CheckCircle2, XCircle, Copy, Check } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Copy, Check, PlusCircle } from 'lucide-react';
 
 export default function AgentDashboard() {
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -59,9 +60,12 @@ export default function AgentDashboard() {
           <div className="p-3 rounded-full bg-green-100 text-green-600 shrink-0">
             <CheckCircle2 className="w-6 h-6" />
           </div>
-          <div>
+          <div className="flex-1">
             <p className="font-extrabold text-gray-900 mb-1">Approved Agent</p>
-            <p className="text-sm text-gray-500">You&apos;re approved and can start referring customers. Referral submission is coming in the next update.</p>
+            <p className="text-sm text-gray-500 mb-4">You&apos;re approved and can start referring customers.</p>
+            <Link href="/agent/add-customer" className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+              <PlusCircle className="w-4 h-4" /> Add Customer
+            </Link>
           </div>
         </div>
       )}

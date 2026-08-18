@@ -442,6 +442,29 @@ export interface Agent {
   createdAt: string;
 }
 
+// A customer an Agent has referred. Accepting one creates a real
+// `customers` + `applications` row via the existing, unmodified
+// api.saveCustomer/api.saveApplication — this is the entry point into the
+// existing workflow, never a parallel one.
+export interface AgentReferral {
+  id: string;
+  ref: string;
+  agentId: string;
+  agentSerial?: string; // joined for display, not a DB column
+  agentName?: string; // joined for display, not a DB column
+  customerName: string;
+  customerPhone: string;
+  estateLocation: string;
+  plotSize: string;
+  note?: string;
+  status: 'Submitted' | 'Under Review' | 'Accepted' | 'Rejected';
+  rejectionReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  customerId?: string;
+  createdAt: string;
+}
+
 export interface Customer extends BaseRolePrep {
   id: string;
   ref: string; // e.g. MIRE-CUS-2026-0001

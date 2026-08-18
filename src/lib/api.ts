@@ -1,8 +1,8 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToBanner, mapBannerToDb, mapDbToAgent, mapAgentToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
-import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Banner, Agent, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToBanner, mapBannerToDb, mapDbToAgent, mapAgentToDb, mapDbToAgentReferral, mapAgentReferralToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
+import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Banner, Agent, AgentReferral, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
 import { ActivityLog, Notification } from './models-extensions';
-import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef, generateAllocationRef, generateAgentSerial } from './generators';
+import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef, generateAllocationRef, generateAgentSerial, generateReferralRef } from './generators';
 import { DEFAULT_QUALIFICATION_QUESTIONS, DEFAULT_CONDITIONAL_QUESTION } from './defaultCampaignQuestions';
 
 // We use the browser client for the UI data layer
@@ -1451,6 +1451,78 @@ export const api = {
       .eq('id', id).select().single();
     if (error) throw new Error(error.message);
     return mapDbToAgent(data);
+  },
+
+  // --- AGENT PORTAL: REFERRALS ---
+  async submitAgentReferral(referral: { customerName: string; customerPhone: string; estateLocation: string; plotSize: string; note?: string }): Promise<AgentReferral> {
+    const supabase = getSupabase();
+    const agent = await this.getMyAgentProfile();
+    if (!agent) throw new Error('No agent profile found for this account.');
+    if (agent.status !== 'Approved') throw new Error('Your agent account must be approved before you can submit referrals.');
+
+    const { count, error: countErr } = await supabase.from('agent_referrals').select('*', { count: 'exact', head: true });
+    if (countErr) throw new Error(countErr.message);
+    const ref = generateReferralRef((count || 0) + 1);
+
+    const mapped = mapAgentReferralToDb({ ref, agentId: agent.id, ...referral });
+    const { data, error } = await supabase.from('agent_referrals').insert(mapped).select().single();
+
+    if (error) {
+      if (error.code === '23505') throw new Error('This customer already has an open referral pending review.');
+      throw new Error(error.message);
+    }
+    return mapDbToAgentReferral(data);
+  },
+
+  async getMyReferrals(): Promise<AgentReferral[]> {
+    const { data, error } = await getSupabase().from('agent_referrals').select('*').order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ? data.map(mapDbToAgentReferral) : [];
+  },
+
+  // Joins the referring agent's serial/name for the Secretary review list.
+  async getAgentReferrals(status?: AgentReferral['status']): Promise<AgentReferral[]> {
+    let query = getSupabase().from('agent_referrals').select('*, agents(agent_serial, full_name)').order('created_at', { ascending: false });
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data ? data.map(mapDbToAgentReferral) : [];
+  },
+
+  // Creates the real customer + application via the existing, unmodified
+  // saveCustomer/saveApplication — the same functions every other
+  // customer-creation path in this app already uses, at their normal
+  // default statuses. This is the entry point into the existing workflow,
+  // never a parallel shortcut (no auto-approval, unlike the internal
+  // "Create Customer Portal" fast path).
+  async acceptReferral(referralId: string, reviewedBy: string): Promise<AgentReferral> {
+    const supabase = getSupabase();
+    const { data: referral, error: refErr } = await supabase.from('agent_referrals').select('*').eq('id', referralId).single();
+    if (refErr) throw new Error(refErr.message);
+
+    const customer = await this.saveCustomer({
+      fullName: referral.customer_name,
+      phone: referral.customer_phone,
+      status: 'Active'
+    });
+    await this.saveApplication({
+      customerId: customer.id,
+      status: 'Pending Review'
+    });
+
+    const { data, error } = await supabase.from('agent_referrals')
+      .update({ status: 'Accepted', reviewed_by: reviewedBy, reviewed_at: new Date().toISOString(), customer_id: customer.id })
+      .eq('id', referralId).select().single();
+    if (error) throw new Error(error.message);
+    return mapDbToAgentReferral(data);
+  },
+
+  async rejectReferral(referralId: string, reason: string, reviewedBy: string): Promise<AgentReferral> {
+    const { data, error } = await getSupabase().from('agent_referrals')
+      .update({ status: 'Rejected', rejection_reason: reason, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() })
+      .eq('id', referralId).select().single();
+    if (error) throw new Error(error.message);
+    return mapDbToAgentReferral(data);
   },
 
   // --- LEADS: UPDATE STATUS ---

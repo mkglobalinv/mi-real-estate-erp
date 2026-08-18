@@ -37,3 +37,7 @@ export const generateAllocationRef = (count: number): string => {
 export const generateAgentSerial = (count: number): string => {
   return `MI-AG-${count.toString().padStart(6, '0')}`;
 };
+
+export const generateReferralRef = (count: number): string => {
+  return `REF-${new Date().getFullYear()}-${count.toString().padStart(4, '0')}`;
+};
