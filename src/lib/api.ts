@@ -1495,7 +1495,16 @@ export const api = {
   // default statuses. This is the entry point into the existing workflow,
   // never a parallel shortcut (no auto-approval, unlike the internal
   // "Create Customer Portal" fast path).
-  async acceptReferral(referralId: string, reviewedBy: string): Promise<AgentReferral> {
+  //
+  // Commission eligibility is decided right here, not gated behind the
+  // customer's later application/agreement approval: Secretary accepting
+  // the referral IS the eligibility decision. The commission amount comes
+  // from the active agent_commission_rules row whose label matches the
+  // referral's plot_size (e.g. "40x40") — never hard-coded. If no active
+  // rule matches, the commission is simply not created here; Secretary can
+  // still use confirmCommissionEligibility as a manual fallback once a
+  // matching rule exists.
+  async acceptReferral(referralId: string, reviewedBy: string): Promise<AgentReferral & { commissionAmount?: number; commissionError?: string }> {
     const supabase = getSupabase();
     const { data: referral, error: refErr } = await supabase.from('agent_referrals').select('*').eq('id', referralId).single();
     if (refErr) throw new Error(refErr.message);
@@ -1514,7 +1523,35 @@ export const api = {
       .update({ status: 'Accepted', reviewed_by: reviewedBy, reviewed_at: new Date().toISOString(), customer_id: customer.id })
       .eq('id', referralId).select().single();
     if (error) throw new Error(error.message);
-    return mapDbToAgentReferral(data);
+
+    let commissionAmount: number | undefined;
+    let commissionError: string | undefined;
+    const { data: rule, error: ruleErr } = await supabase.from('agent_commission_rules')
+      .select('*').eq('label', referral.plot_size).eq('is_active', true).maybeSingle();
+    if (ruleErr) {
+      commissionError = `Could not look up a commission rule: ${ruleErr.message}`;
+    } else if (!rule) {
+      commissionError = `No active commission rule matches plot size "${referral.plot_size}" — set one up under Chairman → Commission Rules, then use Confirm Commission Eligibility on the Payments page.`;
+    } else {
+      const mapped = mapAgentCommissionToDb({
+        agentId: referral.agent_id,
+        referralId,
+        customerId: customer.id,
+        commissionRuleId: rule.id,
+        commissionAmount: rule.commission_amount,
+        status: 'Pending Chairman Payment',
+        eligibilityConfirmedBy: reviewedBy,
+        eligibilityConfirmedAt: new Date().toISOString()
+      });
+      const { error: commissionErr } = await supabase.from('agent_commissions').insert(mapped);
+      if (commissionErr) {
+        commissionError = `Referral accepted, but the commission record failed to save: ${commissionErr.message}`;
+      } else {
+        commissionAmount = rule.commission_amount;
+      }
+    }
+
+    return { ...mapDbToAgentReferral(data), commissionAmount, commissionError };
   },
 
   async rejectReferral(referralId: string, reason: string, reviewedBy: string): Promise<AgentReferral> {
@@ -1560,10 +1597,13 @@ export const api = {
     return data ? data.map(mapDbToAgentCommission) : [];
   },
 
-  // The full eligibility gate from the approved plan: referral accepted,
-  // application Chairman-approved, an approved agreement on file, and no
-  // commission already recorded for this referral. commission_amount is
-  // snapshotted from the selected rule at this moment — never a live join.
+  // Manual fallback for when acceptReferral's automatic rule-match found
+  // nothing (e.g. no active rule configured yet for that plot size at
+  // Accept time). Eligibility itself was already decided when Secretary
+  // accepted the referral — this only re-checks that the referral is
+  // Accepted and doesn't already have a commission on file.
+  // commission_amount is snapshotted from the selected rule at this
+  // moment — never a live join.
   async confirmCommissionEligibility(referralId: string, accountId: string, commissionRuleId: string, confirmedBy: string): Promise<AgentCommission> {
     const supabase = getSupabase();
 
@@ -1575,16 +1615,6 @@ export const api = {
 
     const { data: existing } = await supabase.from('agent_commissions').select('id').eq('referral_id', referralId).maybeSingle();
     if (existing) throw new Error('A commission record already exists for this referral.');
-
-    const { data: apps } = await supabase.from('applications').select('status').eq('customer_id', referral.customer_id).order('created_at', { ascending: false }).limit(1);
-    if (!apps?.[0] || apps[0].status !== 'Chairman Approved') {
-      throw new Error('This customer’s application has not been Chairman-approved yet.');
-    }
-
-    const { data: docs } = await supabase.from('documents').select('status').eq('customer_id', referral.customer_id).in('type', ['Sale Agreement', 'Offer Letter']);
-    if (!docs?.some((d: { status: string }) => d.status === 'Approved')) {
-      throw new Error('This customer does not have an approved agreement on file yet.');
-    }
 
     const { data: rule, error: ruleErr } = await supabase.from('agent_commission_rules').select('*').eq('id', commissionRuleId).single();
     if (ruleErr) throw new Error(ruleErr.message);
