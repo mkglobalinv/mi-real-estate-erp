@@ -7,7 +7,7 @@ import {
   Building2, LayoutDashboard, Users, MapPin, PlusCircle,
   Settings, Activity, Calendar, Wallet, CheckSquare, FolderGit2,
   Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone,
-  Image as ImageIcon
+  Image as ImageIcon, UserCheck
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
@@ -120,6 +120,15 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <Link href="/chairman/banners" onClick={closeMenu} className={linkClass('/chairman/banners')}>
               <ImageIcon className={iconClass('/chairman/banners')} />
               Promo Banners
+            </Link>
+
+            {/* AGENTS */}
+            <div className="pt-6 pb-1 px-4">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Agents</p>
+            </div>
+            <Link href="/chairman/agents" onClick={closeMenu} className={linkClass('/chairman/agents')}>
+              <UserCheck className={iconClass('/chairman/agents')} />
+              Agent Management
             </Link>
 
             {/* PORTFOLIO */}

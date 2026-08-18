@@ -39,6 +39,7 @@ export async function login(formData: FormData) {
       if (role === 'Admin Engineer') return redirect('/admin-engineer')
       if (role === 'Super Admin') return redirect('/admin')
       if (role === 'Customer') return redirect('/portal')
+      if (role === 'Agent') return redirect('/agent')
     }
   }
 

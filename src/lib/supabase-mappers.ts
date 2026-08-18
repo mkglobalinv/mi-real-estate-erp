@@ -706,6 +706,30 @@ export function mapAnnouncementToDb(data: any): any {
   };
 }
 
+export function mapDbToAgent(db: any): any {
+  return {
+    id: db.id, profileId: db.profile_id, agentSerial: db.agent_serial, fullName: db.full_name,
+    phone: db.phone, email: db.email, bankName: db.bank_name, accountNumber: db.account_number,
+    accountName: db.account_name, status: db.status, rejectionReason: db.rejection_reason,
+    approvedBy: db.approved_by, approvedAt: db.approved_at, createdAt: db.created_at
+  };
+}
+export function mapAgentToDb(data: any): any {
+  return {
+    ...(data.id && { id: data.id }), ...(data.profileId && { profile_id: data.profileId }),
+    ...(data.agentSerial && { agent_serial: data.agentSerial }),
+    ...(data.fullName && { full_name: data.fullName }), ...(data.phone && { phone: data.phone }),
+    ...(data.email !== undefined && { email: data.email }),
+    ...(data.bankName && { bank_name: data.bankName }),
+    ...(data.accountNumber && { account_number: data.accountNumber }),
+    ...(data.accountName && { account_name: data.accountName }),
+    ...(data.status && { status: data.status }),
+    ...(data.rejectionReason !== undefined && { rejection_reason: data.rejectionReason }),
+    ...(data.approvedBy !== undefined && { approved_by: data.approvedBy }),
+    ...(data.approvedAt !== undefined && { approved_at: data.approvedAt })
+  };
+}
+
 export function mapDbToBanner(db: any): any {
   return {
     id: db.id, title: db.title, description: db.description, imageUrl: db.image_url,
