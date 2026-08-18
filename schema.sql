@@ -823,6 +823,7 @@ CREATE TABLE IF NOT EXISTS public.agent_referrals (
     estate_location TEXT NOT NULL,
     plot_size TEXT NOT NULL,
     note TEXT,
+    source TEXT NOT NULL DEFAULT 'Agent Portal' CHECK (source IN ('Agent Portal', 'Referral Link')),
     status TEXT NOT NULL DEFAULT 'Submitted' CHECK (status IN ('Submitted', 'Under Review', 'Accepted', 'Rejected')),
     rejection_reason TEXT,
     reviewed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -1012,3 +1013,20 @@ CREATE POLICY "agent_receipts_insert_staff" ON storage.objects
     bucket_id = 'agent-commission-receipts'
     AND EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin'))
   );
+
+-- ============================================================================
+-- 35. AGENT PORTAL V2 — REFERRAL LINKS
+-- Purely additive: one new column on the existing agent_referrals table.
+-- No existing row, constraint, or RLS policy is altered. A referral
+-- submitted through an Agent's public link (/r/[agentSerial]) is inserted
+-- by /api/referrals/submit using the service-role key — the same trust
+-- model already used by /api/agents/register — so no anon INSERT policy is
+-- opened up on agent_referrals. Reversible by dropping the column.
+-- ============================================================================
+
+ALTER TABLE public.agent_referrals
+  ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'Agent Portal';
+
+ALTER TABLE public.agent_referrals DROP CONSTRAINT IF EXISTS agent_referrals_source_check;
+ALTER TABLE public.agent_referrals ADD CONSTRAINT agent_referrals_source_check
+  CHECK (source IN ('Agent Portal', 'Referral Link'));

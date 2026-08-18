@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Agent, AgentReferral, AgentCommission } from '@/lib/types';
-import { Clock, XCircle, Copy, Check, PlusCircle, Users, Wallet, ArrowRight } from 'lucide-react';
+import { Clock, XCircle, Copy, Check, PlusCircle, Users, Wallet, ArrowRight, Link2 } from 'lucide-react';
 
 // A referral's user-facing stage. Only ever derived from agent_referrals
 // and agent_commissions — both properly RLS-scoped to this agent's own
@@ -42,6 +42,7 @@ export default function AgentDashboard() {
   const [commissions, setCommissions] = useState<AgentCommission[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     api.getMyAgentProfile().then(async loadedAgent => {
@@ -59,6 +60,15 @@ export default function AgentDashboard() {
     navigator.clipboard.writeText(agent.agentSerial);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const referralLink = agent && typeof window !== 'undefined' ? `${window.location.origin}/r/${agent.agentSerial}` : '';
+
+  const copyReferralLink = () => {
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
   };
 
   if (loading) {
@@ -119,6 +129,22 @@ export default function AgentDashboard() {
 
       {agent.status === 'Approved' && (
         <>
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2.5 rounded-xl bg-teal-50 text-teal-600 shrink-0">
+                <Link2 className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-extrabold text-gray-900 text-sm">My Referral Link</p>
+                <p className="text-xs text-gray-500 truncate">Share this — customers can submit their own details directly.</p>
+              </div>
+            </div>
+            <button onClick={copyReferralLink} className="inline-flex items-center gap-2 bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-100 transition-colors shrink-0">
+              {linkCopied ? 'Copied!' : 'Copy Link'}
+              {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+
           <div className="flex justify-end mb-6">
             <Link href="/agent/add-customer" className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
               <PlusCircle className="w-4 h-4" /> Add Customer
