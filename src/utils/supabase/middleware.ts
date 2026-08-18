@@ -70,7 +70,8 @@ export async function updateSession(request: NextRequest) {
       'Admin Engineer': '/admin-engineer',
       'Finance': '/finance',
       'Super Admin': '/admin',
-      'Customer': '/portal'
+      'Customer': '/portal',
+      'Agent': '/agent'
     }
 
     const isStaffRoute = ['/admin', '/chairman', '/director', '/secretary', '/customer-care', '/social-media-director', '/admin-engineer', '/finance', '/archive'].some(p => pathname.startsWith(p))
@@ -143,10 +144,23 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
+      if (pathname.startsWith('/agent') && role !== 'Agent') {
+        const url = request.nextUrl.clone()
+        url.pathname = portalPath || '/portal'
+        return NextResponse.redirect(url)
+      }
+
       // Customer trying to access any staff area
       if (role === 'Customer' && isStaffRoute) {
         const url = request.nextUrl.clone()
         url.pathname = '/portal'
+        return NextResponse.redirect(url)
+      }
+
+      // Agent trying to access any staff area
+      if (role === 'Agent' && isStaffRoute) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/agent'
         return NextResponse.redirect(url)
       }
     }

@@ -421,6 +421,27 @@ export interface Application extends BaseRolePrep {
   createdAt: string;
 }
 
+// Agent Portal — a referral partner, distinct from staff and Customer
+// roles. Never able to approve customers, change payment/property status,
+// or see another Agent's referrals/commissions (enforced by RLS, not just
+// the UI — see schema.sql section 34).
+export interface Agent {
+  id: string;
+  profileId?: string;
+  agentSerial: string; // e.g. MI-AG-000125
+  fullName: string;
+  phone: string;
+  email?: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  rejectionReason?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdAt: string;
+}
+
 export interface Customer extends BaseRolePrep {
   id: string;
   ref: string; // e.g. MIRE-CUS-2026-0001

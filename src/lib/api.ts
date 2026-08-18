@@ -1,8 +1,8 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToBanner, mapBannerToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
-import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Banner, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToBanner, mapBannerToDb, mapDbToAgent, mapAgentToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
+import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Banner, Agent, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
 import { ActivityLog, Notification } from './models-extensions';
-import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef, generateAllocationRef } from './generators';
+import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef, generateAllocationRef, generateAgentSerial } from './generators';
 import { DEFAULT_QUALIFICATION_QUESTIONS, DEFAULT_CONDITIONAL_QUESTION } from './defaultCampaignQuestions';
 
 // We use the browser client for the UI data layer
@@ -1401,6 +1401,56 @@ export const api = {
   async deleteBanner(id: string): Promise<void> {
     const { error } = await getSupabase().from('banners').delete().eq('id', id);
     if (error) throw new Error(error.message);
+  },
+
+  // --- AGENT PORTAL: AGENTS ---
+  // `client` lets server-side routes (registration, which must use the
+  // service-role key) reuse this same function, matching how
+  // saveCustomer/saveApplication already support an optional admin client.
+  async saveAgent(agent: Partial<Agent>, client?: any): Promise<Agent> {
+    const supabase = client || getSupabase();
+    if (!agent.id && !agent.agentSerial) {
+      const { count, error: countErr } = await supabase.from('agents').select('*', { count: 'exact', head: true });
+      if (countErr) throw new Error(countErr.message);
+      agent.agentSerial = generateAgentSerial((count || 0) + 1);
+    }
+    const mapped = mapAgentToDb(agent);
+    const { data, error } = await supabase.from('agents').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToAgent(data);
+  },
+
+  async getAgents(status?: Agent['status']): Promise<Agent[]> {
+    let query = getSupabase().from('agents').select('*').order('created_at', { ascending: false });
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data ? data.map(mapDbToAgent) : [];
+  },
+
+  async getMyAgentProfile(): Promise<Agent | null> {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await supabase.from('agents').select('*').eq('profile_id', user.id).maybeSingle();
+    if (error || !data) return null;
+    return mapDbToAgent(data);
+  },
+
+  async approveAgent(id: string, approvedBy: string): Promise<Agent> {
+    const { data, error } = await getSupabase().from('agents')
+      .update({ status: 'Approved', approved_by: approvedBy, approved_at: new Date().toISOString(), rejection_reason: null })
+      .eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    return mapDbToAgent(data);
+  },
+
+  async rejectAgent(id: string, reason: string, approvedBy: string): Promise<Agent> {
+    const { data, error } = await getSupabase().from('agents')
+      .update({ status: 'Rejected', rejection_reason: reason, approved_by: approvedBy, approved_at: new Date().toISOString() })
+      .eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    return mapDbToAgent(data);
   },
 
   // --- LEADS: UPDATE STATUS ---
