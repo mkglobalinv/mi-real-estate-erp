@@ -91,6 +91,7 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
         <div className="animate-pulse text-gray-500 py-12 text-center">Loading referrals...</div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -147,6 +148,7 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
               })}
             </tbody>
           </table>
+          </div>
           {referrals.length === 0 && (
             <div className="text-center py-12 text-gray-500">No {tab.toLowerCase()} referrals.</div>
           )}
