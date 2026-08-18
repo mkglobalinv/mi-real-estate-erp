@@ -1605,6 +1605,30 @@ export const api = {
     return mapDbToAgentCommission(data);
   },
 
+  // receiptUrl is the object PATH within the private agent-commission-
+  // receipts bucket (not a public URL — the bucket has no public read
+  // policy). Viewing it later always goes through a signed URL, generated
+  // on demand for whoever is authorized to see it.
+  async markCommissionPaid(id: string, details: { paymentReference: string; receiptUrl: string; paidBy: string }): Promise<AgentCommission> {
+    const supabase = getSupabase();
+    const { data: existing, error: fetchErr } = await supabase.from('agent_commissions').select('status').eq('id', id).single();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (existing.status !== 'Pending Chairman Payment') {
+      throw new Error('This commission is not awaiting payment.');
+    }
+    const { data, error } = await supabase.from('agent_commissions')
+      .update({
+        status: 'Paid',
+        payment_reference: details.paymentReference,
+        receipt_url: details.receiptUrl,
+        paid_by: details.paidBy,
+        paid_at: new Date().toISOString()
+      })
+      .eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    return mapDbToAgentCommission(data);
+  },
+
   // --- LEADS: UPDATE STATUS ---
   async updateLeadStatus(id: string, status: Lead['status']): Promise<Lead> {
     const { data, error } = await getSupabase()
