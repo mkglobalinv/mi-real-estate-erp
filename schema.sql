@@ -977,12 +977,18 @@ CREATE POLICY "agent_commissions_insert_staff_only" ON public.agent_commissions
   TO authenticated
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')));
 
+-- Update (not insert) on agent_commissions is exclusively markCommissionPaid
+-- (src/lib/api.ts) — the Chairman's manual-payment step. Secretary's only
+-- legitimate action on this table is confirmCommissionEligibility, which is
+-- an INSERT (see agent_commissions_insert_staff_only above) and does not
+-- need UPDATE. Scoping UPDATE to Chairman/Super Admin only, so a Secretary
+-- session cannot mark a commission Paid directly, even via a raw DB call.
 DROP POLICY IF EXISTS "agent_commissions_update_staff_only" ON public.agent_commissions;
 CREATE POLICY "agent_commissions_update_staff_only" ON public.agent_commissions
   FOR UPDATE
   TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Secretary', 'Chairman', 'Super Admin')));
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')));
 
 -- Bucket-scoped storage policies: only Chairman/Super Admin can upload or
 -- read commission receipts directly. Agent-facing receipt viewing is
