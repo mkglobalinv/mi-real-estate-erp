@@ -57,6 +57,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: roleError.message }, { status: 500 });
     }
 
+    // Agents are activated immediately on self-registration — no Chairman
+    // review gate. Approved/Rejected remain valid statuses so the Chairman
+    // can still deactivate a specific agent afterward (agent_referrals_
+    // insert_own in schema.sql requires status='Approved', so deactivating
+    // one immediately blocks further referral submissions from that agent).
     const agent = await api.saveAgent({
       profileId: data.user.id,
       fullName,
@@ -65,7 +70,8 @@ export async function POST(request: Request) {
       bankName,
       accountNumber,
       accountName,
-      status: 'Pending'
+      status: 'Approved',
+      approvedAt: new Date().toISOString()
     }, supabaseAdmin);
 
     return NextResponse.json({ success: true, agent }, { status: 201 });

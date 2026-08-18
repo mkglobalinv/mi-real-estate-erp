@@ -7,11 +7,11 @@ import { createClient } from '@/utils/supabase/client';
 import { UserCheck, CheckCircle, XCircle, Clock, Phone, Landmark } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-type Tab = 'Pending' | 'Approved' | 'Rejected';
+type Tab = 'Approved' | 'Rejected';
 
 export default function AgentManager({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [tab, setTab] = useState<Tab>('Pending');
+  const [tab, setTab] = useState<Tab>('Approved');
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -28,16 +28,20 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
     setLoading(false);
   };
 
-  const handleApprove = async (agent: Agent) => {
+  // Reinstates a previously deactivated agent — sets status back to
+  // Approved, which immediately restores their ability to submit
+  // referrals (agent_referrals_insert_own in schema.sql requires
+  // status='Approved').
+  const handleReactivate = async (agent: Agent) => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       await api.approveAgent(agent.id, user.id);
-      toast.success(`${agent.fullName} approved.`);
+      toast.success(`${agent.fullName} reactivated.`);
       loadData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to approve agent');
+      toast.error(err instanceof Error ? err.message : 'Failed to reactivate agent');
     }
   };
 
@@ -49,17 +53,16 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
       if (!user) return;
       const agent = agents.find(a => a.id === rejectingId);
       await api.rejectAgent(rejectingId, rejectReason.trim(), user.id);
-      toast.success(`${agent?.fullName || 'Agent'} rejected.`);
+      toast.success(`${agent?.fullName || 'Agent'} deactivated.`);
       setRejectingId(null);
       setRejectReason('');
       loadData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to reject agent');
+      toast.error(err instanceof Error ? err.message : 'Failed to deactivate agent');
     }
   };
 
   const tabCounts: Record<Tab, { icon: typeof Clock; color: string }> = {
-    Pending: { icon: Clock, color: 'amber' },
     Approved: { icon: CheckCircle, color: 'green' },
     Rejected: { icon: XCircle, color: 'red' },
   };
@@ -71,7 +74,7 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <UserCheck className="w-6 h-6 text-[var(--color-primary)]" /> Agent Management
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Review Agent Portal registrations and manage referral partners.</p>
+          <p className="text-gray-500 text-sm mt-1">Agents are active immediately on registration. Deactivate one here if needed.</p>
         </div>
       </div>
 
@@ -104,8 +107,9 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
                 <th className="p-4 font-bold text-gray-600 text-sm">Contact</th>
                 <th className="p-4 font-bold text-gray-600 text-sm">Bank Details</th>
                 <th className="p-4 font-bold text-gray-600 text-sm">Registered</th>
-                {tab === 'Pending' && <th className="p-4 font-bold text-gray-600 text-sm">Actions</th>}
+                {tab === 'Approved' && <th className="p-4 font-bold text-gray-600 text-sm">Actions</th>}
                 {tab === 'Rejected' && <th className="p-4 font-bold text-gray-600 text-sm">Reason</th>}
+                {tab === 'Rejected' && <th className="p-4 font-bold text-gray-600 text-sm">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -122,18 +126,22 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
                     <div className="text-xs text-gray-400 mt-0.5">{a.accountNumber} — {a.accountName}</div>
                   </td>
                   <td className="p-4 text-xs text-gray-500">{new Date(a.createdAt).toLocaleDateString()}</td>
-                  {tab === 'Pending' && (
-                    <td className="p-4 flex items-center gap-2">
-                      <button onClick={() => handleApprove(a)} className="inline-flex items-center gap-1 bg-[var(--color-primary)] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[var(--color-primary-dark)]">
-                        <CheckCircle className="w-3 h-3" /> Approve
-                      </button>
+                  {tab === 'Approved' && (
+                    <td className="p-4">
                       <button onClick={() => { setRejectingId(a.id); setRejectReason(''); }} className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">
-                        <XCircle className="w-3 h-3" /> Reject
+                        <XCircle className="w-3 h-3" /> Deactivate
                       </button>
                     </td>
                   )}
                   {tab === 'Rejected' && (
                     <td className="p-4 text-sm text-gray-600 max-w-xs">{a.rejectionReason || '—'}</td>
+                  )}
+                  {tab === 'Rejected' && (
+                    <td className="p-4">
+                      <button onClick={() => handleReactivate(a)} className="inline-flex items-center gap-1 bg-[var(--color-primary)] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[var(--color-primary-dark)]">
+                        <CheckCircle className="w-3 h-3" /> Reactivate
+                      </button>
+                    </td>
                   )}
                 </tr>
               ))}
@@ -148,19 +156,19 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
       {rejectingId && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold mb-2">Reject Agent Application</h3>
-            <p className="text-sm text-gray-500 mb-4">Provide a reason. The applicant does not see this automatically in V1 — relay it directly if needed.</p>
+            <h3 className="text-lg font-bold mb-2">Deactivate Agent Account</h3>
+            <p className="text-sm text-gray-500 mb-4">Provide a reason — the Agent will see this on their dashboard, and they immediately lose the ability to submit new referrals.</p>
             <textarea
               autoFocus
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
               rows={3}
               className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-red-400"
-              placeholder="e.g. Bank details could not be verified"
+              placeholder="e.g. Reported for misconduct"
             />
             <div className="flex justify-end gap-3 pt-4">
               <button onClick={() => { setRejectingId(null); setRejectReason(''); }} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium">Cancel</button>
-              <button onClick={handleReject} disabled={!rejectReason.trim()} className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50">Confirm Reject</button>
+              <button onClick={handleReject} disabled={!rejectReason.trim()} className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50">Confirm Deactivate</button>
             </div>
           </div>
         </div>
