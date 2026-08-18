@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { createClient } from '@/utils/supabase/client';
-import { PaymentProof, Customer, EasyBuyAccount, Allocation, Project, Installment } from '@/lib/types';
+import { PaymentProof, Customer, EasyBuyAccount, Allocation, Project, Installment, AgentReferral, AgentCommission, CommissionRule } from '@/lib/types';
 import {
-  CreditCard, Check, X, Eye, FileText, Calendar, MapPin, CheckCircle2, XCircle, Upload, Receipt as ReceiptIcon
+  CreditCard, Check, X, Eye, FileText, Calendar, MapPin, CheckCircle2, XCircle, Upload, Receipt as ReceiptIcon, Banknote
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -42,17 +42,22 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
   const [projects, setProjects] = useState<Project[]>([]);
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [referrals, setReferrals] = useState<AgentReferral[]>([]);
+  const [commissions, setCommissions] = useState<AgentCommission[]>([]);
+  const [commissionRules, setCommissionRules] = useState<CommissionRule[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('pending');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmingProofId, setConfirmingProofId] = useState<string | null>(null);
+  const [selectedRuleId, setSelectedRuleId] = useState('');
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const [pf, cs, ac, al, pr, inst, docs] = await Promise.all([
+    const [pf, cs, ac, al, pr, inst, docs, refs, comms, rules] = await Promise.all([
       api.getPaymentProofs(),
       api.getCustomers(),
       api.getEasyBuyAccounts(),
@@ -60,6 +65,9 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
       api.getProjects(),
       api.getInstallments(),
       api.getDocuments(),
+      api.getAgentReferrals('Accepted'),
+      api.getAgentCommissions(),
+      api.getCommissionRules(),
     ]);
 
     setProofs(pf);
@@ -69,6 +77,9 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
     setProjects(pr);
     setInstallments(inst);
     setDocuments(docs as DocumentRow[]);
+    setReferrals(refs);
+    setCommissions(comms);
+    setCommissionRules(rules.filter(r => r.isActive));
   };
 
   const getCustomer = (id: string) => customers.find(c => c.id === id);
@@ -92,6 +103,40 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
     if (!proof.notes?.startsWith(RECEIPT_NOTE_PREFIX)) return null;
     const docId = proof.notes.slice(RECEIPT_NOTE_PREFIX.length);
     return documents.find(d => d.id === docId) || null;
+  };
+
+  // Agent commission eligibility only ever applies to a customer's Initial
+  // Deposit payment, and only when that customer came in through an
+  // accepted Agent referral — every other payment proof is unaffected.
+  const getReferralForCustomer = (customerId: string) => referrals.find(r => r.customerId === customerId);
+  const getCommissionForReferral = (referralId: string) => commissions.find(c => c.referralId === referralId);
+
+  const handleConfirmCommission = async (proof: PaymentProof) => {
+    const referral = getReferralForCustomer(proof.customerId);
+    const account = getAccount(proof.customerId);
+    if (!referral || !account || !selectedRuleId) return;
+
+    setBusyId(proof.id);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      await api.confirmCommissionEligibility(referral.id, account.id, selectedRuleId, user?.id || '');
+
+      await api.logActivity({
+        user: 'Secretary',
+        module: 'Agent Commissions',
+        action: `Confirmed commission eligibility for referral ${referral.ref} (${referral.customerName})`
+      });
+
+      toast.success('Commission eligibility confirmed. It now shows in the Chairman’s Commission Payments queue.');
+      setConfirmingProofId(null);
+      setSelectedRuleId('');
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to confirm commission eligibility');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleUploadReceipt = async (proof: PaymentProof, file: File) => {
@@ -308,6 +353,9 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
             const isRejecting = rejectingId === proof.id;
             const busy = busyId === proof.id;
             const receipt = activeTab === 'approved' ? getReceiptForProof(proof) : null;
+            const referral = activeTab === 'approved' && installment?.installmentNumber === 0 ? getReferralForCustomer(proof.customerId) : undefined;
+            const commission = referral ? getCommissionForReferral(referral.id) : undefined;
+            const isConfirmingCommission = confirmingProofId === proof.id;
 
             return (
               <div key={proof.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -360,6 +408,26 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
                       autoFocus
                       className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-red-200 focus:border-red-300"
                     />
+                  </div>
+                )}
+
+                {isConfirmingCommission && (
+                  <div className="px-5 pb-4">
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">Commission Rule <span className="text-red-500">*</span></label>
+                    <select
+                      value={selectedRuleId}
+                      onChange={e => setSelectedRuleId(e.target.value)}
+                      autoFocus
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:ring-2 focus:ring-[var(--color-primary)]"
+                    >
+                      <option value="">Select the plot-size rule that applies...</option>
+                      {commissionRules.map(rule => (
+                        <option key={rule.id} value={rule.id}>{rule.label} — ₦{rule.commissionAmount.toLocaleString()}</option>
+                      ))}
+                    </select>
+                    {commissionRules.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1.5">No active commission rules configured yet — set one up under Chairman → Commission Rules.</p>
+                    )}
                   </div>
                 )}
 
@@ -428,6 +496,29 @@ export default function SecretaryPaymentsPage({ basePath = '/admin', params: rou
                           }}
                         />
                       </label>
+                    )
+                  )}
+
+                  {referral && (
+                    commission ? (
+                      <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold ${
+                        commission.status === 'Paid' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-amber-50 text-amber-600 border border-amber-100'
+                      }`}>
+                        <Banknote className="w-4 h-4" /> Commission: {commission.status}
+                      </span>
+                    ) : isConfirmingCommission ? (
+                      <>
+                        <button onClick={() => handleConfirmCommission(proof)} disabled={busy || !selectedRuleId} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold btn-primary disabled:opacity-60">
+                          <Check className="w-4 h-4" /> Confirm Eligibility
+                        </button>
+                        <button onClick={() => { setConfirmingProofId(null); setSelectedRuleId(''); }} disabled={busy} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors">
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => { setConfirmingProofId(proof.id); setSelectedRuleId(''); }} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition-colors">
+                        <Banknote className="w-4 h-4" /> Confirm Commission Eligibility
+                      </button>
                     )
                   )}
                 </div>

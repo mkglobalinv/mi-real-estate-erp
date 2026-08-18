@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/client';
-import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToBanner, mapBannerToDb, mapDbToAgent, mapAgentToDb, mapDbToAgentReferral, mapAgentReferralToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
-import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Banner, Agent, AgentReferral, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
+import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDbToLead, mapLeadToDb, mapDbToCustomer, mapCustomerToDb, mapDbToCampaign, mapCampaignToDb, mapDbToCampaignQuestion, mapCampaignQuestionToDb, mapDbToCampaignFaq, mapCampaignFaqToDb, mapDbToCampaignMedia, mapCampaignMediaToDb, mapDbToEasyBuyAccount, mapEasyBuyAccountToDb, mapDbToInstallment, mapInstallmentToDb, mapDbToPaymentProof, mapPaymentProofToDb, mapDbToLedgerTransaction, mapLedgerTransactionToDb, mapDbToReceipt, mapReceiptToDb, mapDbToAllocation, mapAllocationToDb, mapDbToInspection, mapInspectionToDb, mapDbToReservation, mapReservationToDb, mapDbToCustomerCareTicket, mapCustomerCareTicketToDb, mapDbToActivityLog, mapActivityLogToDb, mapDbToNotification, mapDbToWebsiteEnquiry, mapWebsiteEnquiryToDb, mapDbToAnnouncement, mapAnnouncementToDb, mapDbToBanner, mapBannerToDb, mapDbToAgent, mapAgentToDb, mapDbToAgentReferral, mapAgentReferralToDb, mapDbToCommissionRule, mapCommissionRuleToDb, mapDbToAgentCommission, mapAgentCommissionToDb, mapDbToTestimonial, mapTestimonialToDb, mapDbToOfficeInfo, mapOfficeInfoToDb, mapDbToTask, mapTaskToDb, mapDbToSearchAnalytics, mapDbToApplication, mapApplicationToDb, mapDbToApplicationFormTemplate, mapApplicationFormTemplateToDb, mapDbToCampaignAiDraft, mapCampaignAiDraftToDb, mapDbToCampaignPackage, mapCampaignPackageToDb } from './supabase-mappers';
+import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Banner, Agent, AgentReferral, CommissionRule, AgentCommission, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef, generateAllocationRef, generateAgentSerial, generateReferralRef } from './generators';
 import { DEFAULT_QUALIFICATION_QUESTIONS, DEFAULT_CONDITIONAL_QUESTION } from './defaultCampaignQuestions';
@@ -1523,6 +1523,86 @@ export const api = {
       .eq('id', referralId).select().single();
     if (error) throw new Error(error.message);
     return mapDbToAgentReferral(data);
+  },
+
+  // --- AGENT PORTAL: COMMISSION RULES ---
+  // Unfiltered select — RLS transparently restricts the result set: a
+  // Secretary/Agent only ever gets rows with is_active=true, a Chairman/
+  // Super Admin gets everything (see schema.sql section 34.7). No app-side
+  // filtering needed to get the right rows for either audience.
+  async getCommissionRules(): Promise<CommissionRule[]> {
+    const { data, error } = await getSupabase().from('agent_commission_rules').select('*').order('label', { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ? data.map(mapDbToCommissionRule) : [];
+  },
+
+  async saveCommissionRule(rule: Partial<CommissionRule>): Promise<CommissionRule> {
+    const mapped = mapCommissionRuleToDb(rule);
+    const { data, error } = await getSupabase().from('agent_commission_rules').upsert(mapped).select().single();
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return mapDbToCommissionRule(data);
+  },
+
+  // --- AGENT PORTAL: COMMISSIONS ---
+  async getAgentCommissions(status?: AgentCommission['status']): Promise<AgentCommission[]> {
+    let query = getSupabase().from('agent_commissions').select('*, agents(agent_serial, full_name), customers(full_name)').order('created_at', { ascending: false });
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data ? data.map(mapDbToAgentCommission) : [];
+  },
+
+  async getMyCommissions(): Promise<AgentCommission[]> {
+    const agent = await this.getMyAgentProfile();
+    if (!agent) return [];
+    const { data, error } = await getSupabase().from('agent_commissions').select('*, customers(full_name)').eq('agent_id', agent.id).order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ? data.map(mapDbToAgentCommission) : [];
+  },
+
+  // The full eligibility gate from the approved plan: referral accepted,
+  // application Chairman-approved, an approved agreement on file, and no
+  // commission already recorded for this referral. commission_amount is
+  // snapshotted from the selected rule at this moment — never a live join.
+  async confirmCommissionEligibility(referralId: string, accountId: string, commissionRuleId: string, confirmedBy: string): Promise<AgentCommission> {
+    const supabase = getSupabase();
+
+    const { data: referral, error: refErr } = await supabase.from('agent_referrals').select('*').eq('id', referralId).single();
+    if (refErr) throw new Error(refErr.message);
+    if (referral.status !== 'Accepted' || !referral.customer_id) {
+      throw new Error('This referral has not been accepted yet.');
+    }
+
+    const { data: existing } = await supabase.from('agent_commissions').select('id').eq('referral_id', referralId).maybeSingle();
+    if (existing) throw new Error('A commission record already exists for this referral.');
+
+    const { data: apps } = await supabase.from('applications').select('status').eq('customer_id', referral.customer_id).order('created_at', { ascending: false }).limit(1);
+    if (!apps?.[0] || apps[0].status !== 'Chairman Approved') {
+      throw new Error('This customer’s application has not been Chairman-approved yet.');
+    }
+
+    const { data: docs } = await supabase.from('documents').select('status').eq('customer_id', referral.customer_id).in('type', ['Sale Agreement', 'Offer Letter']);
+    if (!docs?.some((d: { status: string }) => d.status === 'Approved')) {
+      throw new Error('This customer does not have an approved agreement on file yet.');
+    }
+
+    const { data: rule, error: ruleErr } = await supabase.from('agent_commission_rules').select('*').eq('id', commissionRuleId).single();
+    if (ruleErr) throw new Error(ruleErr.message);
+
+    const mapped = mapAgentCommissionToDb({
+      agentId: referral.agent_id,
+      referralId,
+      customerId: referral.customer_id,
+      accountId,
+      commissionRuleId,
+      commissionAmount: rule.commission_amount,
+      status: 'Pending Chairman Payment',
+      eligibilityConfirmedBy: confirmedBy,
+      eligibilityConfirmedAt: new Date().toISOString()
+    });
+    const { data, error } = await supabase.from('agent_commissions').insert(mapped).select().single();
+    if (error) throw new Error(error.message);
+    return mapDbToAgentCommission(data);
   },
 
   // --- LEADS: UPDATE STATUS ---

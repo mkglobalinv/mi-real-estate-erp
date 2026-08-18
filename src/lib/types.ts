@@ -465,6 +465,45 @@ export interface AgentReferral {
   createdAt: string;
 }
 
+// Chairman-configured commission amounts, keyed by a plot-size label (e.g.
+// "40x40"). Never hard-coded into application code — this table is the
+// single source of truth agent_commissions snapshots from.
+export interface CommissionRule {
+  id: string;
+  label: string;
+  referencePropertyValue?: number;
+  referenceInitialDeposit?: number;
+  commissionAmount: number;
+  isActive: boolean;
+  createdBy?: string;
+  createdAt: string;
+}
+
+// commissionAmount is a snapshot taken when Secretary confirms eligibility
+// — never a live join to CommissionRule, so a later rule edit never
+// retroactively changes an already-recorded commission.
+export interface AgentCommission {
+  id: string;
+  agentId: string;
+  referralId: string;
+  customerId: string;
+  accountId?: string;
+  commissionRuleId?: string;
+  commissionAmount: number;
+  status: 'Pending Eligibility' | 'Pending Chairman Payment' | 'Paid';
+  eligibilityConfirmedBy?: string;
+  eligibilityConfirmedAt?: string;
+  paidBy?: string;
+  paidAt?: string;
+  paymentReference?: string;
+  receiptUrl?: string;
+  createdAt: string;
+  // Joined for display, not DB columns
+  agentSerial?: string;
+  agentName?: string;
+  customerName?: string;
+}
+
 export interface Customer extends BaseRolePrep {
   id: string;
   ref: string; // e.g. MIRE-CUS-2026-0001
