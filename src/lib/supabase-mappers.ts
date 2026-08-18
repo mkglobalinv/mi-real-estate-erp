@@ -761,6 +761,54 @@ export function mapAgentReferralToDb(data: any): any {
   };
 }
 
+export function mapDbToCommissionRule(db: any): any {
+  return {
+    id: db.id, label: db.label, referencePropertyValue: db.reference_property_value,
+    referenceInitialDeposit: db.reference_initial_deposit, commissionAmount: db.commission_amount,
+    isActive: db.is_active, createdBy: db.created_by, createdAt: db.created_at
+  };
+}
+export function mapCommissionRuleToDb(data: any): any {
+  return {
+    ...(data.id && { id: data.id }), ...(data.label && { label: data.label }),
+    ...(data.referencePropertyValue !== undefined && { reference_property_value: data.referencePropertyValue }),
+    ...(data.referenceInitialDeposit !== undefined && { reference_initial_deposit: data.referenceInitialDeposit }),
+    ...(data.commissionAmount !== undefined && { commission_amount: data.commissionAmount }),
+    ...(data.isActive !== undefined && { is_active: data.isActive }),
+    ...(data.createdBy !== undefined && { created_by: data.createdBy })
+  };
+}
+
+// `db.agents`/`db.customers` are optional nested joins used by the Chairman
+// commission-payments list (Phase 5); absent when read from an Agent's own
+// commissions, where that context is already known.
+export function mapDbToAgentCommission(db: any): any {
+  return {
+    id: db.id, agentId: db.agent_id, referralId: db.referral_id, customerId: db.customer_id,
+    accountId: db.account_id, commissionRuleId: db.commission_rule_id, commissionAmount: db.commission_amount,
+    status: db.status, eligibilityConfirmedBy: db.eligibility_confirmed_by, eligibilityConfirmedAt: db.eligibility_confirmed_at,
+    paidBy: db.paid_by, paidAt: db.paid_at, paymentReference: db.payment_reference, receiptUrl: db.receipt_url,
+    createdAt: db.created_at,
+    agentSerial: db.agents?.agent_serial, agentName: db.agents?.full_name, customerName: db.customers?.full_name
+  };
+}
+export function mapAgentCommissionToDb(data: any): any {
+  return {
+    ...(data.id && { id: data.id }), ...(data.agentId && { agent_id: data.agentId }),
+    ...(data.referralId && { referral_id: data.referralId }), ...(data.customerId && { customer_id: data.customerId }),
+    ...(data.accountId !== undefined && { account_id: data.accountId }),
+    ...(data.commissionRuleId !== undefined && { commission_rule_id: data.commissionRuleId }),
+    ...(data.commissionAmount !== undefined && { commission_amount: data.commissionAmount }),
+    ...(data.status && { status: data.status }),
+    ...(data.eligibilityConfirmedBy !== undefined && { eligibility_confirmed_by: data.eligibilityConfirmedBy }),
+    ...(data.eligibilityConfirmedAt !== undefined && { eligibility_confirmed_at: data.eligibilityConfirmedAt }),
+    ...(data.paidBy !== undefined && { paid_by: data.paidBy }),
+    ...(data.paidAt !== undefined && { paid_at: data.paidAt }),
+    ...(data.paymentReference !== undefined && { payment_reference: data.paymentReference }),
+    ...(data.receiptUrl !== undefined && { receipt_url: data.receiptUrl })
+  };
+}
+
 export function mapDbToBanner(db: any): any {
   return {
     id: db.id, title: db.title, description: db.description, imageUrl: db.image_url,
