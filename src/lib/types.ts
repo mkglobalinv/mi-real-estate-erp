@@ -502,6 +502,9 @@ export interface AgentCommission {
   // Joined for display, not DB columns
   agentSerial?: string;
   agentName?: string;
+  agentBankName?: string;
+  agentAccountNumber?: string;
+  agentAccountName?: string;
   customerName?: string;
 }
 

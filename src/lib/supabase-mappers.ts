@@ -790,7 +790,9 @@ export function mapDbToAgentCommission(db: any): any {
     status: db.status, eligibilityConfirmedBy: db.eligibility_confirmed_by, eligibilityConfirmedAt: db.eligibility_confirmed_at,
     paidBy: db.paid_by, paidAt: db.paid_at, paymentReference: db.payment_reference, receiptUrl: db.receipt_url,
     createdAt: db.created_at,
-    agentSerial: db.agents?.agent_serial, agentName: db.agents?.full_name, customerName: db.customers?.full_name
+    agentSerial: db.agents?.agent_serial, agentName: db.agents?.full_name,
+    agentBankName: db.agents?.bank_name, agentAccountNumber: db.agents?.account_number, agentAccountName: db.agents?.account_name,
+    customerName: db.customers?.full_name
   };
 }
 export function mapAgentCommissionToDb(data: any): any {
