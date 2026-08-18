@@ -375,6 +375,16 @@ CREATE TABLE IF NOT EXISTS public.applications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- applications intentionally has no RLS — same "public SELECT / authenticated
+-- write, app-layer authorization" posture as customers, payment_proofs,
+-- easy_buy_accounts, and the other core tables in this schema. If RLS ever
+-- gets enabled on this table without a policy (e.g. via Supabase's Security
+-- Advisor "Enable RLS" prompt), every INSERT into it — including the normal
+-- Secretary/Chairman application workflow, not just Agent Portal referrals —
+-- starts failing with "new row violates row-level security policy". This
+-- statement is here so re-running schema.sql restores the intended state.
+ALTER TABLE public.applications DISABLE ROW LEVEL SECURITY;
+
 -- ============================================================================
 -- 26. LANDING PAGE AGENT / CAMPAIGN BUILDER — PHASE 1 FOUNDATION
 -- Additive, backward-compatible extensions to the EXISTING campaign system.
