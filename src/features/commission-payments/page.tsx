@@ -120,11 +120,16 @@ export default function CommissionPaymentsManager({ basePath = '/admin', params:
             const isPaying = payingId === c.id;
             return (
               <div key={c.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Agent</p>
                     <p className="font-mono text-sm font-bold text-gray-900">{c.agentSerial}</p>
                     <p className="text-xs text-gray-500">{c.agentName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Pay To</p>
+                    <p className="font-bold text-gray-900">{c.agentBankName || '—'}</p>
+                    <p className="text-xs text-gray-500">{c.agentAccountNumber} — {c.agentAccountName}</p>
                   </div>
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Customer</p>

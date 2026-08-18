@@ -1545,7 +1545,7 @@ export const api = {
 
   // --- AGENT PORTAL: COMMISSIONS ---
   async getAgentCommissions(status?: AgentCommission['status']): Promise<AgentCommission[]> {
-    let query = getSupabase().from('agent_commissions').select('*, agents(agent_serial, full_name), customers(full_name)').order('created_at', { ascending: false });
+    let query = getSupabase().from('agent_commissions').select('*, agents(agent_serial, full_name, bank_name, account_number, account_name), customers(full_name)').order('created_at', { ascending: false });
     if (status) query = query.eq('status', status);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
