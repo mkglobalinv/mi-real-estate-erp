@@ -131,7 +131,6 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
                 <th className="p-4 font-bold text-gray-600 text-sm">Location / Plot</th>
                 <th className="p-4 font-bold text-gray-600 text-sm">Submitted</th>
                 {tab === 'Submitted' && <th className="p-4 font-bold text-gray-600 text-sm">Actions</th>}
-                {tab === 'Accepted' && <th className="p-4 font-bold text-gray-600 text-sm">Commission</th>}
                 {tab === 'Rejected' && <th className="p-4 font-bold text-gray-600 text-sm">Reason</th>}
               </tr>
             </thead>
@@ -165,6 +164,23 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
                         </span>
                       )}
                       {r.note && <p className="text-xs text-gray-400 mt-1 italic">&quot;{r.note}&quot;</p>}
+                      {tab === 'Accepted' && (
+                        commission ? (
+                          <span className={`inline-flex items-center gap-1 mt-1 px-3 py-1.5 rounded-full text-xs font-bold ${
+                            commission.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            <Banknote className="w-3 h-3" /> ₦{commission.commissionAmount.toLocaleString()} — {commission.status}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRetryCommission(r)}
+                            disabled={retryingId === r.id}
+                            className="inline-flex items-center gap-1 mt-1 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-60"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${retryingId === r.id ? 'animate-spin' : ''}`} /> {retryingId === r.id ? 'Retrying...' : 'No commission — Retry'}
+                          </button>
+                        )
+                      )}
                     </td>
                     <td className="p-4 text-sm text-gray-600">
                       <div className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-gray-400" /> {r.estateLocation}</div>
@@ -179,25 +195,6 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
                         <button onClick={() => { setRejectingId(r.id); setRejectReason(''); }} className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">
                           <XCircle className="w-3 h-3" /> Reject
                         </button>
-                      </td>
-                    )}
-                    {tab === 'Accepted' && (
-                      <td className="p-4">
-                        {commission ? (
-                          <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${
-                            commission.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            <Banknote className="w-3 h-3" /> ₦{commission.commissionAmount.toLocaleString()} — {commission.status}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleRetryCommission(r)}
-                            disabled={retryingId === r.id}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-60"
-                          >
-                            <RefreshCw className={`w-3 h-3 ${retryingId === r.id ? 'animate-spin' : ''}`} /> {retryingId === r.id ? 'Retrying...' : 'No commission — Retry'}
-                          </button>
-                        )}
                       </td>
                     )}
                     {tab === 'Rejected' && (
