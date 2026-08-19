@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { AgentReferral, Customer } from '@/lib/types';
+import { AgentReferral, AgentCommission, Customer } from '@/lib/types';
 import { createClient } from '@/utils/supabase/client';
-import { Users, CheckCircle, XCircle, AlertTriangle, MapPin, SearchCheck, UserPlus } from 'lucide-react';
+import { Users, CheckCircle, XCircle, AlertTriangle, MapPin, SearchCheck, UserPlus, Banknote, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type Tab = 'Submitted' | 'Accepted' | 'Rejected';
@@ -13,10 +13,12 @@ type Tab = 'Submitted' | 'Accepted' | 'Rejected';
 export default function AgentReferralsManager({ basePath = '/secretary', params: routeParams }: { basePath?: string, params?: any }) {
   const [referrals, setReferrals] = useState<AgentReferral[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [commissions, setCommissions] = useState<AgentCommission[]>([]);
   const [tab, setTab] = useState<Tab>('Submitted');
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -25,10 +27,33 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
 
   const loadData = async () => {
     setLoading(true);
-    const [refs, custs] = await Promise.all([api.getAgentReferrals(tab), api.getCustomers()]);
+    const [refs, custs, comms] = await Promise.all([api.getAgentReferrals(tab), api.getCustomers(), api.getAgentCommissions()]);
     setReferrals(refs);
     setCustomers(custs);
+    setCommissions(comms);
     setLoading(false);
+  };
+
+  const getCommissionForReferral = (referralId: string) => commissions.find(c => c.referralId === referralId);
+
+  const handleRetryCommission = async (referral: AgentReferral) => {
+    setRetryingId(referral.id);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const result = await api.retryReferralCommission(referral.id, user.id);
+      if (result.commissionAmount) {
+        toast.success(`Commission of ₦${result.commissionAmount.toLocaleString()} is now payable by the Chairman.`);
+      } else {
+        toast.error(result.commissionError || 'Still no matching commission rule.', { duration: 8000 });
+      }
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create commission');
+    } finally {
+      setRetryingId(null);
+    }
   };
 
   const findPossibleDuplicate = (phone: string) => customers.find(c => c.phone === phone);
@@ -106,12 +131,14 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
                 <th className="p-4 font-bold text-gray-600 text-sm">Location / Plot</th>
                 <th className="p-4 font-bold text-gray-600 text-sm">Submitted</th>
                 {tab === 'Submitted' && <th className="p-4 font-bold text-gray-600 text-sm">Actions</th>}
+                {tab === 'Accepted' && <th className="p-4 font-bold text-gray-600 text-sm">Commission</th>}
                 {tab === 'Rejected' && <th className="p-4 font-bold text-gray-600 text-sm">Reason</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {referrals.map(r => {
                 const duplicate = findPossibleDuplicate(r.customerPhone);
+                const commission = getCommissionForReferral(r.id);
                 return (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="p-4">
@@ -152,6 +179,25 @@ export default function AgentReferralsManager({ basePath = '/secretary', params:
                         <button onClick={() => { setRejectingId(r.id); setRejectReason(''); }} className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-200">
                           <XCircle className="w-3 h-3" /> Reject
                         </button>
+                      </td>
+                    )}
+                    {tab === 'Accepted' && (
+                      <td className="p-4">
+                        {commission ? (
+                          <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${
+                            commission.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            <Banknote className="w-3 h-3" /> ₦{commission.commissionAmount.toLocaleString()} — {commission.status}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleRetryCommission(r)}
+                            disabled={retryingId === r.id}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-60"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${retryingId === r.id ? 'animate-spin' : ''}`} /> {retryingId === r.id ? 'Retrying...' : 'No commission — Retry'}
+                          </button>
+                        )}
                       </td>
                     )}
                     {tab === 'Rejected' && (
