@@ -24,6 +24,16 @@ export default function Home() {
     api.getProjects().then(data => setProjects(data.filter(p => p.active).slice(0, 3)));
     api.getOfficeInfo().then(setOffice);
     api.getTestimonials().then(data => setTestimonials(data.filter(t => t.isActive)));
+
+    // Deep-link support for ad campaigns (e.g. Facebook): visiting
+    // /?qualify=true opens the qualification popup immediately, so an ad
+    // can link straight into the funnel instead of just the homepage.
+    // Read directly from window.location rather than useSearchParams so
+    // this page stays statically prerenderable (no Suspense boundary
+    // needed for a one-time check on mount).
+    if (new URLSearchParams(window.location.search).get('qualify') === 'true') {
+      setShowQualifier(true);
+    }
   }, []);
 
   const handleCallbackSubmit = async (e: React.FormEvent) => {
