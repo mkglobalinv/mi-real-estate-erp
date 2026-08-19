@@ -1489,6 +1489,46 @@ export const api = {
     return data ? data.map(mapDbToAgentReferral) : [];
   },
 
+  // Shared by acceptReferral (automatic, at Accept time) and
+  // retryReferralCommission (manual, from the Accepted tab when the
+  // automatic attempt found nothing). Looks up the active
+  // agent_commission_rules row whose label exactly matches plotSize and
+  // creates the agent_commissions row at 'Pending Chairman Payment' if
+  // found — commission amount always comes from the rule, never
+  // hard-coded. Every outcome (success, no match, insert failure) is
+  // reported back rather than swallowed, since a silent failure here is a
+  // silent failure to pay an Agent.
+  async _createCommissionForReferral(params: { referralId: string; agentId: string; customerId: string; plotSize: string; confirmedBy: string }): Promise<{ commissionAmount?: number; commissionError?: string }> {
+    const supabase = getSupabase();
+    const { data: existing } = await supabase.from('agent_commissions').select('id').eq('referral_id', params.referralId).maybeSingle();
+    if (existing) return { commissionError: 'A commission record already exists for this referral.' };
+
+    const { data: rule, error: ruleErr } = await supabase.from('agent_commission_rules')
+      .select('*').eq('label', params.plotSize).eq('is_active', true).maybeSingle();
+    if (ruleErr) {
+      return { commissionError: `Could not look up a commission rule: ${ruleErr.message}` };
+    }
+    if (!rule) {
+      return { commissionError: `No active commission rule matches plot size "${params.plotSize}" exactly — check Chairman → Commission Rules for a typo or case mismatch in the label, then retry.` };
+    }
+
+    const mapped = mapAgentCommissionToDb({
+      agentId: params.agentId,
+      referralId: params.referralId,
+      customerId: params.customerId,
+      commissionRuleId: rule.id,
+      commissionAmount: rule.commission_amount,
+      status: 'Pending Chairman Payment',
+      eligibilityConfirmedBy: params.confirmedBy,
+      eligibilityConfirmedAt: new Date().toISOString()
+    });
+    const { error: commissionErr } = await supabase.from('agent_commissions').insert(mapped);
+    if (commissionErr) {
+      return { commissionError: `The commission record failed to save: ${commissionErr.message}` };
+    }
+    return { commissionAmount: rule.commission_amount };
+  },
+
   // Creates the real customer + application via the existing, unmodified
   // saveCustomer/saveApplication — the same functions every other
   // customer-creation path in this app already uses, at their normal
@@ -1498,12 +1538,8 @@ export const api = {
   //
   // Commission eligibility is decided right here, not gated behind the
   // customer's later application/agreement approval: Secretary accepting
-  // the referral IS the eligibility decision. The commission amount comes
-  // from the active agent_commission_rules row whose label matches the
-  // referral's plot_size (e.g. "40x40") — never hard-coded. If no active
-  // rule matches, the commission is simply not created here; Secretary can
-  // still use confirmCommissionEligibility as a manual fallback once a
-  // matching rule exists.
+  // the referral IS the eligibility decision. See
+  // _createCommissionForReferral for how the rule is matched.
   async acceptReferral(referralId: string, reviewedBy: string): Promise<AgentReferral & { commissionAmount?: number; commissionError?: string }> {
     const supabase = getSupabase();
     const { data: referral, error: refErr } = await supabase.from('agent_referrals').select('*').eq('id', referralId).single();
@@ -1524,34 +1560,29 @@ export const api = {
       .eq('id', referralId).select().single();
     if (error) throw new Error(error.message);
 
-    let commissionAmount: number | undefined;
-    let commissionError: string | undefined;
-    const { data: rule, error: ruleErr } = await supabase.from('agent_commission_rules')
-      .select('*').eq('label', referral.plot_size).eq('is_active', true).maybeSingle();
-    if (ruleErr) {
-      commissionError = `Could not look up a commission rule: ${ruleErr.message}`;
-    } else if (!rule) {
-      commissionError = `No active commission rule matches plot size "${referral.plot_size}" — set one up under Chairman → Commission Rules, then use Confirm Commission Eligibility on the Payments page.`;
-    } else {
-      const mapped = mapAgentCommissionToDb({
-        agentId: referral.agent_id,
-        referralId,
-        customerId: customer.id,
-        commissionRuleId: rule.id,
-        commissionAmount: rule.commission_amount,
-        status: 'Pending Chairman Payment',
-        eligibilityConfirmedBy: reviewedBy,
-        eligibilityConfirmedAt: new Date().toISOString()
-      });
-      const { error: commissionErr } = await supabase.from('agent_commissions').insert(mapped);
-      if (commissionErr) {
-        commissionError = `Referral accepted, but the commission record failed to save: ${commissionErr.message}`;
-      } else {
-        commissionAmount = rule.commission_amount;
-      }
-    }
+    const { commissionAmount, commissionError } = await this._createCommissionForReferral({
+      referralId, agentId: referral.agent_id, customerId: customer.id, plotSize: referral.plot_size, confirmedBy: reviewedBy
+    });
 
     return { ...mapDbToAgentReferral(data), commissionAmount, commissionError };
+  },
+
+  // Manual retry for an already-Accepted referral whose automatic
+  // commission attempt (at Accept time) found no matching rule — e.g. the
+  // rule was configured after the fact. Re-runs the exact same match-by-
+  // plot-size logic; safe to call repeatedly since
+  // _createCommissionForReferral itself checks for an existing commission
+  // first.
+  async retryReferralCommission(referralId: string, confirmedBy: string): Promise<{ commissionAmount?: number; commissionError?: string }> {
+    const supabase = getSupabase();
+    const { data: referral, error: refErr } = await supabase.from('agent_referrals').select('*').eq('id', referralId).single();
+    if (refErr) throw new Error(refErr.message);
+    if (referral.status !== 'Accepted' || !referral.customer_id) {
+      throw new Error('This referral has not been accepted yet.');
+    }
+    return this._createCommissionForReferral({
+      referralId, agentId: referral.agent_id, customerId: referral.customer_id, plotSize: referral.plot_size, confirmedBy
+    });
   },
 
   async rejectReferral(referralId: string, reason: string, reviewedBy: string): Promise<AgentReferral> {
