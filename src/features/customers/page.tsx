@@ -8,6 +8,14 @@ import { Users, Search, ChevronRight, CheckCircle2, Clock, PlusCircle, X, Copy, 
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 
+// Fixed plot plans — price/deposit/term are set exactly as configured by
+// the Chairman, not typed in by hand each time. "Custom" is kept as an
+// escape hatch for a plot size outside these two.
+const PLOT_PLANS: Record<string, { totalAmount: number; initialDeposit: number; installmentPeriod: number }> = {
+  '40x40': { totalAmount: 2900000, initialDeposit: 200000, installmentPeriod: 27 },
+  '20x40': { totalAmount: 1450000, initialDeposit: 100000, installmentPeriod: 27 },
+};
+
 export default function CustomersPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -18,6 +26,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
   
   const [successData, setSuccessData] = useState<{name: string, username: string, tempPass: string} | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isCustomPlot, setIsCustomPlot] = useState(false);
 
   const [formData, setFormData] = useState({
     // Section A
@@ -322,8 +331,29 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Plot Size *</label>
-                        <input required type="text" placeholder="e.g. 50x100" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
-                          value={formData.plotSize} onChange={e => setFormData({...formData, plotSize: e.target.value})} />
+                        <select required className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                          value={isCustomPlot ? 'custom' : formData.plotSize}
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (val === 'custom') {
+                              setIsCustomPlot(true);
+                              setFormData({...formData, plotSize: '', totalAmount: 0, initialDeposit: 0, installmentPeriod: 12});
+                            } else {
+                              const plan = PLOT_PLANS[val];
+                              setIsCustomPlot(false);
+                              setFormData({...formData, plotSize: val, totalAmount: plan.totalAmount, initialDeposit: plan.initialDeposit, installmentPeriod: plan.installmentPeriod});
+                            }
+                          }}>
+                          <option value="">Select a plan...</option>
+                          {Object.entries(PLOT_PLANS).map(([size, plan]) => (
+                            <option key={size} value={size}>{size} — ₦{plan.totalAmount.toLocaleString()}</option>
+                          ))}
+                          <option value="custom">Custom (enter manually)</option>
+                        </select>
+                        {isCustomPlot && (
+                          <input required type="text" placeholder="e.g. 60x120" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white mt-2"
+                            value={formData.plotSize} onChange={e => setFormData({...formData, plotSize: e.target.value})} />
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Plot Number</label>
@@ -332,7 +362,8 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-sm font-bold text-gray-700 mb-1">Total Plot Amount (₦) *</label>
-                        <input required type="number" min="0" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white font-bold text-lg text-gray-900"
+                        <input required type="number" min="0" disabled={!isCustomPlot}
+                          className={`w-full border-gray-200 rounded-lg px-4 py-2.5 font-bold text-lg text-gray-900 ${isCustomPlot ? 'bg-gray-50 focus:bg-white' : 'bg-gray-100 cursor-not-allowed'}`}
                           value={formData.totalAmount || ''} onChange={e => setFormData({...formData, totalAmount: Number(e.target.value)})} />
                       </div>
                     </div>
@@ -344,12 +375,14 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Initial Deposit Amount (₦) *</label>
-                        <input required type="number" min="0" max={formData.totalAmount} className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white font-bold"
+                        <input required type="number" min="0" max={formData.totalAmount} disabled={!isCustomPlot}
+                          className={`w-full border-gray-200 rounded-lg px-4 py-2.5 font-bold ${isCustomPlot ? 'bg-gray-50 focus:bg-white' : 'bg-gray-100 cursor-not-allowed'}`}
                           value={formData.initialDeposit || ''} onChange={e => setFormData({...formData, initialDeposit: Number(e.target.value)})} />
                       </div>
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">Installment Period (Months) *</label>
-                        <input required type="number" min="1" max="120" className="w-full border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 focus:bg-white"
+                        <input required type="number" min="1" max="120" disabled={!isCustomPlot}
+                          className={`w-full border-gray-200 rounded-lg px-4 py-2.5 ${isCustomPlot ? 'bg-gray-50 focus:bg-white' : 'bg-gray-100 cursor-not-allowed'}`}
                           value={formData.installmentPeriod || ''} onChange={e => setFormData({...formData, installmentPeriod: Number(e.target.value)})} />
                       </div>
                       <div className="md:col-span-2">
