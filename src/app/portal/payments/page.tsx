@@ -400,9 +400,9 @@ export default function PortalPayments() {
           <div className="mx-6 mb-6 p-4 bg-blue-50 border border-blue-100 rounded-xl">
             <h3 className="font-bold text-blue-800 text-sm mb-3">Company Bank Details</h3>
             <div className="space-y-2 text-sm text-blue-700">
-              <div className="flex justify-between"><span className="font-medium">Bank Name</span><span>Jaiz Bank Plc</span></div>
-              <div className="flex justify-between"><span className="font-medium">Account Name</span><span>M.I. Real Estate &amp; Gen Ent Ltd</span></div>
-              <div className="flex justify-between"><span className="font-medium">Account Number</span><span className="font-bold tracking-wider">0123456789</span></div>
+              <div className="flex justify-between"><span className="font-medium">Bank Name</span><span>First Bank</span></div>
+              <div className="flex justify-between"><span className="font-medium">Account Name</span><span>M. I. Real Estate and General Enterprises LTD</span></div>
+              <div className="flex justify-between"><span className="font-medium">Account Number</span><span className="font-bold tracking-wider">2048925011</span></div>
             </div>
           </div>
         </form>
