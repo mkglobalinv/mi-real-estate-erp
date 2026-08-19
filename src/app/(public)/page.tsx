@@ -8,12 +8,14 @@ import { Shield, Handshake, TrendingUp, CheckCircle, MapPin, Map, Building2, Hom
 import { api } from '@/lib/api';
 import PropertyCard from '@/components/PropertyCard';
 import PropertySearchWidget from '@/components/PropertySearchWidget';
+import LeadQualificationModal from '@/components/LeadQualificationModal';
 import { OfficeInfo, Testimonial, Project } from '@/lib/types';
 
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [office, setOffice] = useState<OfficeInfo | null>(null);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [showQualifier, setShowQualifier] = useState(false);
 
   const [callbackForm, setCallbackForm] = useState({ name: '', phone: '', location: '', interest: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,9 +102,9 @@ export default function Home() {
             <Link href="/properties" className="px-8 py-4 bg-[var(--color-gold)] text-gray-900 font-bold rounded-xl shadow-lg hover:bg-yellow-500 hover:scale-105 transition-all w-full sm:w-auto">
               View Properties
             </Link>
-            <a href={`https://wa.me/${office?.whatsapp || '2348031234567'}?text=Hello M.I Real Estate, I want to know more about the Easy Buy scheme.`} target="_blank" rel="noopener noreferrer" className="px-8 py-4 bg-green-500 text-white font-bold rounded-xl shadow-lg hover:bg-green-600 hover:scale-105 transition-all w-full sm:w-auto flex justify-center items-center gap-2">
+            <button onClick={() => setShowQualifier(true)} className="px-8 py-4 bg-green-500 text-white font-bold rounded-xl shadow-lg hover:bg-green-600 hover:scale-105 transition-all w-full sm:w-auto flex justify-center items-center gap-2">
               <MessageCircle className="w-5 h-5" /> WhatsApp Us
-            </a>
+            </button>
           </div>
 
           {/* Statistics Block */}
@@ -345,6 +347,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <LeadQualificationModal isOpen={showQualifier} onClose={() => setShowQualifier(false)} />
     </div>
   );
 }
