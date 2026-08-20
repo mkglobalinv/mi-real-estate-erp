@@ -1,6 +1,7 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { api } from '@/lib/api';
 import LeadQualificationFlow from './LeadQualificationFlow';
 
 // Dedicated, distraction-free landing page for ad traffic (e.g. Facebook)
@@ -9,6 +10,10 @@ import LeadQualificationFlow from './LeadQualificationFlow';
 // first. Same LeadQualificationFlow as the in-page popup, just hosted as
 // a full page instead of a modal.
 export default function QualifierLandingPage() {
+  useEffect(() => {
+    api.trackQualifierEvent('page_view');
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 py-10 md:py-16">
       <div className="w-full max-w-md">
@@ -19,7 +24,7 @@ export default function QualifierLandingPage() {
           <p className="text-sm text-gray-500 mt-1">Sabuwar Abuja Estate, Langel Dididi, Kano</p>
         </div>
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 md:p-8">
-          <LeadQualificationFlow />
+          <LeadQualificationFlow onSubmit={() => api.trackQualifierEvent('submission')} />
         </div>
       </div>
     </div>

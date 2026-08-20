@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { Application, Customer } from '@/lib/types';
-import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle } from 'lucide-react';
+import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle, Eye, MessageCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -12,6 +12,7 @@ export default function ChairmanDashboard() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [revenue, setRevenue] = useState<any>({ monthly: 0, total: 0 });
+  const [qualifierStats, setQualifierStats] = useState({ visits: 0, submissions: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,16 +21,18 @@ export default function ChairmanDashboard() {
 
   async function loadData() {
     try {
-      const [allDocs, allCustomers, allRevenue, allApps] = await Promise.all([
+      const [allDocs, allCustomers, allRevenue, allApps, landingStats] = await Promise.all([
         (api as any).getDocuments ? (api as any).getDocuments() : Promise.resolve([]),
         api.getCustomers(),
         api.getRevenueReports(),
-        api.getApplications()
+        api.getApplications(),
+        api.getQualifierLandingStats()
       ]);
       setDocuments(allDocs);
       setCustomers(allCustomers);
       setRevenue(allRevenue);
       setApplications(allApps);
+      setQualifierStats(landingStats);
     } catch (err) {
       toast.error('Failed to load Chairman Dashboard data');
     } finally {
@@ -104,6 +107,24 @@ export default function ChairmanDashboard() {
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-2"><UsersIcon className="w-5 h-5 text-blue-500"/><span className="text-sm font-bold text-gray-500 uppercase">Customers</span></div>
             <h3 className="text-3xl font-extrabold">{activeCustomers}</h3>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Landing Page Analytics <span className="text-sm font-normal text-gray-400">(mirealestat.com/?qualify=true)</span></h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-2"><Eye className="w-5 h-5 text-blue-500"/><span className="text-sm font-bold text-gray-500 uppercase">Visits</span></div>
+            <h3 className="text-3xl font-extrabold">{qualifierStats.visits}</h3>
+          </div>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-2"><MessageCircle className="w-5 h-5 text-green-600"/><span className="text-sm font-bold text-gray-500 uppercase">Submitted (WhatsApp)</span></div>
+            <h3 className="text-3xl font-extrabold">{qualifierStats.submissions}</h3>
+          </div>
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-5 h-5 text-orange-500"/><span className="text-sm font-bold text-gray-500 uppercase">Conversion Rate</span></div>
+            <h3 className="text-3xl font-extrabold">{qualifierStats.visits > 0 ? Math.round((qualifierStats.submissions / qualifierStats.visits) * 100) : 0}%</h3>
           </div>
         </div>
       </div>

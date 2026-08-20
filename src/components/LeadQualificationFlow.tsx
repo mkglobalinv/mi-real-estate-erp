@@ -31,7 +31,7 @@ function planSummary(plan: '40x40' | '20x40') {
 // the concern of whoever hosts it (LeadQualificationModal for the
 // in-page popup, QualifierLandingPage for the dedicated ad-traffic page),
 // so the same flow renders identically in both.
-export default function LeadQualificationFlow({ onDone }: { onDone?: () => void }) {
+export default function LeadQualificationFlow({ onDone, onSubmit }: { onDone?: () => void; onSubmit?: () => void }) {
   const [step, setStep] = useState<Step>(1);
   const [plotChoice, setPlotChoice] = useState<PlotChoice | ''>('');
   const [selectedPlan, setSelectedPlan] = useState<'40x40' | '20x40' | ''>('');
@@ -102,6 +102,7 @@ export default function LeadQualificationFlow({ onDone }: { onDone?: () => void 
     window.open(waLink, '_blank', 'noopener,noreferrer');
     setSubmitting(false);
     setCompleted(true);
+    onSubmit?.();
     onDone?.();
   };
 
