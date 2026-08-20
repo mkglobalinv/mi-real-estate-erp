@@ -1040,3 +1040,17 @@ ALTER TABLE public.agent_referrals
 ALTER TABLE public.agent_referrals DROP CONSTRAINT IF EXISTS agent_referrals_source_check;
 ALTER TABLE public.agent_referrals ADD CONSTRAINT agent_referrals_source_check
   CHECK (source IN ('Agent Portal', 'Referral Link'));
+
+-- ============================================================================
+-- 36. QUALIFIER LANDING PAGE ANALYTICS
+-- Tracks visits and WhatsApp submissions on the /?qualify=true ad-traffic
+-- landing page (QualifierLandingPage.tsx), shown on the Chairman dashboard.
+-- Same public-write posture as campaign_analytics above: no RLS, since the
+-- page is anonymous ad traffic with no auth session to check against.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.qualifier_landing_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_type TEXT NOT NULL CHECK (event_type IN ('page_view', 'submission')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);

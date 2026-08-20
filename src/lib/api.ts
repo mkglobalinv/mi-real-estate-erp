@@ -1067,6 +1067,26 @@ export const api = {
     return [];
   },
 
+  // --- QUALIFIER LANDING PAGE ANALYTICS (mirealestat.com/?qualify=true) ---
+  async trackQualifierEvent(eventType: 'page_view' | 'submission'): Promise<void> {
+    try {
+      const { error } = await getSupabase().from('qualifier_landing_events').insert({ event_type: eventType });
+      if (error) console.error('Supabase trackQualifierEvent error:', error);
+    } catch (err) {
+      console.error('Failed to track qualifier landing event', err);
+    }
+  },
+
+  async getQualifierLandingStats(): Promise<{ visits: number; submissions: number }> {
+    const { data, error } = await getSupabase().from('qualifier_landing_events').select('event_type');
+    if (error || !data) return { visits: 0, submissions: 0 };
+    const rows = data as Array<{ event_type: string }>;
+    return {
+      visits: rows.filter(r => r.event_type === 'page_view').length,
+      submissions: rows.filter(r => r.event_type === 'submission').length
+    };
+  },
+
   // Submissions for a campaign, with their lead score attached — used by
   // the campaign analytics/leads view.
   async getCampaignSubmissions(campaignId: string): Promise<unknown[]> {
