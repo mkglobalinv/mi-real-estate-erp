@@ -7,7 +7,7 @@ import {
   Building2, LayoutDashboard, Users, MapPin, PlusCircle,
   Settings, Activity, Calendar, Wallet, CheckSquare, FolderGit2,
   Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone,
-  Image as ImageIcon, UserCheck, Banknote
+  Image as ImageIcon, UserCheck, Banknote, AlertTriangle
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
@@ -176,6 +176,19 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <Link href="/chairman/logs" onClick={closeMenu} className={linkClass('/chairman/logs')}>
               <Activity className={iconClass('/chairman/logs')} />
               Activity Logs
+            </Link>
+
+            {/* DANGER ZONE */}
+            <div className="pt-6 pb-1 px-4">
+              <p className="text-[11px] font-bold text-red-500 uppercase tracking-widest">Danger Zone</p>
+            </div>
+            <Link href="/chairman/system-reset" onClick={closeMenu} className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all group ${
+              isActive('/chairman/system-reset')
+                ? 'bg-red-500/20 text-red-400'
+                : 'text-red-400/80 hover:bg-red-950/50 hover:text-red-400'
+            }`}>
+              <AlertTriangle className="flex-shrink-0 mr-3 w-5 h-5 text-red-500" />
+              Production Data Reset
             </Link>
           </nav>
         </div>
