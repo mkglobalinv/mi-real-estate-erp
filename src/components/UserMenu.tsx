@@ -5,11 +5,13 @@ import { LogOut, User, ChevronDown } from 'lucide-react';
 import { useRole } from '@/components/providers/RoleProvider';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import AccountSettingsModal from '@/components/AccountSettingsModal';
 
 export default function UserMenu() {
   const { userName, role, loading } = useRole();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   
@@ -74,12 +76,12 @@ export default function UserMenu() {
             <button
               onClick={() => {
                 setIsOpen(false);
-                // Can add profile navigation here if needed in the future
+                setShowAccountModal(true);
               }}
               className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[var(--color-primary)] flex items-center transition-colors"
             >
               <User className="w-4 h-4 mr-2" />
-              My Profile
+              Account Settings
             </button>
           </div>
           
@@ -95,6 +97,8 @@ export default function UserMenu() {
           </div>
         </div>
       )}
+
+      {showAccountModal && <AccountSettingsModal onClose={() => setShowAccountModal(false)} />}
     </div>
   );
 }
