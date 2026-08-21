@@ -103,37 +103,43 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/director') && role !== 'Director') {
+      // Chairman additionally gets read/act access into the 7 staff
+      // portals below (Director through Agent) for direct oversight from
+      // the Executive Dashboard's Portal Access links — same pattern
+      // already used for /archive further down. Does NOT extend to the
+      // Super Admin console (/admin) or the Customer self-service portal
+      // (/portal), which stay unchanged.
+      if (pathname.startsWith('/director') && role !== 'Director' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/secretary') && role !== 'Secretary') {
+      if (pathname.startsWith('/secretary') && role !== 'Secretary' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/customer-care') && role !== 'Customer Care') {
+      if (pathname.startsWith('/customer-care') && role !== 'Customer Care' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/social-media-director') && role !== 'Social Media Director') {
+      if (pathname.startsWith('/social-media-director') && role !== 'Social Media Director' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/admin-engineer') && role !== 'Admin Engineer') {
+      if (pathname.startsWith('/admin-engineer') && role !== 'Admin Engineer' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/finance') && role !== 'Finance') {
+      if (pathname.startsWith('/finance') && role !== 'Finance' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
@@ -145,7 +151,7 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/agent') && role !== 'Agent') {
+      if (pathname.startsWith('/agent') && role !== 'Agent' && role !== 'Chairman') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
