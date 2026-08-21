@@ -6,11 +6,13 @@ import { Campaign } from '@/lib/types';
 import Link from 'next/link';
 import { ExternalLink, Plus, Search, Edit, Trash2, Settings, ListPlus, MessageSquare, Copy, Play, Pause, Archive, BarChart3, Sparkles, Wallet } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import BulkDeleteBar from '@/components/admin/BulkDeleteBar';
 
 export default function AdminCampaignsPage({ basePath = '/admin', params: routeParams }: { basePath?: string, params?: any }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const loadCampaigns = async () => {
     try {
@@ -63,10 +65,29 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
     }
   };
 
-  const filteredCampaigns = campaigns.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredCampaigns = campaigns.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.slug.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.length === filteredCampaigns.length ? [] : filteredCampaigns.map(c => c.id));
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await api.deleteCampaigns(selectedIds);
+      toast.success(`${selectedIds.length} campaign(s) deleted`);
+      setSelectedIds([]);
+      loadCampaigns();
+    } catch {
+      toast.error('Failed to delete campaigns');
+    }
+  };
 
   return (
     <div>
@@ -100,11 +121,22 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
         </div>
       </div>
 
+      <BulkDeleteBar
+        count={selectedIds.length}
+        itemLabel="campaign"
+        consequence="Its questions, media, FAQs, packages, analytics, and captured leads go with it."
+        onConfirm={handleBulkDelete}
+        onClear={() => setSelectedIds([])}
+      />
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-100 text-sm font-semibold text-gray-600">
               <tr>
+                <th className="p-4 w-10">
+                  <input type="checkbox" checked={filteredCampaigns.length > 0 && selectedIds.length === filteredCampaigns.length} onChange={toggleSelectAll} className="w-4 h-4 accent-[var(--color-primary)]" aria-label="Select all campaigns" />
+                </th>
                 <th className="p-4">Campaign Details</th>
                 <th className="p-4">Dates</th>
                 <th className="p-4">Status</th>
@@ -116,6 +148,7 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
               {loading ? (
                 [...Array(3)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
+                    <td className="p-4"></td>
                     <td className="p-4"><div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div><div className="h-3 bg-gray-200 rounded w-1/2"></div></td>
                     <td className="p-4"><div className="h-3 bg-gray-200 rounded w-24 mb-2"></div><div className="h-3 bg-gray-200 rounded w-24"></div></td>
                     <td className="p-4"><div className="h-6 bg-gray-200 rounded-full w-16"></div></td>
@@ -124,9 +157,12 @@ export default function AdminCampaignsPage({ basePath = '/admin', params: routeP
                   </tr>
                 ))
               ) : filteredCampaigns.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-500">No campaigns found.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-gray-500">No campaigns found.</td></tr>
               ) : filteredCampaigns.map((camp) => (
-                <tr key={camp.id} className="hover:bg-gray-50/50 transition-colors">
+                <tr key={camp.id} className={`hover:bg-gray-50/50 transition-colors ${selectedIds.includes(camp.id) ? 'bg-green-50/50' : ''}`}>
+                  <td className="p-4">
+                    <input type="checkbox" checked={selectedIds.includes(camp.id)} onChange={() => toggleSelected(camp.id)} className="w-4 h-4 accent-[var(--color-primary)]" aria-label={`Select ${camp.name}`} />
+                  </td>
                   <td className="p-4">
                     <p className="font-bold text-gray-900">{camp.name}</p>
                     <p className="text-xs text-gray-500">/campaign/{camp.slug}</p>

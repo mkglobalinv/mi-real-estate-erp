@@ -6,6 +6,7 @@ import { Agent } from '@/lib/types';
 import { createClient } from '@/utils/supabase/client';
 import { UserCheck, CheckCircle, XCircle, Clock, Phone, Landmark } from 'lucide-react';
 import toast from 'react-hot-toast';
+import BulkDeleteBar from '@/components/admin/BulkDeleteBar';
 
 type Tab = 'Pending' | 'Approved' | 'Rejected';
 
@@ -15,6 +16,7 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadData();
@@ -26,6 +28,25 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
     const data = await api.getAgents(tab);
     setAgents(data);
     setLoading(false);
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.length === agents.length ? [] : agents.map(a => a.id));
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await api.deleteAgents(selectedIds);
+      toast.success(`${selectedIds.length} agent(s) deleted`);
+      setSelectedIds([]);
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete agents');
+    }
   };
 
   const handleApprove = async (agent: Agent) => {
@@ -81,7 +102,7 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
           return (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => { setTab(t); setSelectedIds([]); }}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
                 tab === t ? 'border-[var(--color-primary)] text-[var(--color-primary)]' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
@@ -92,6 +113,14 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
         })}
       </div>
 
+      <BulkDeleteBar
+        count={selectedIds.length}
+        itemLabel="agent"
+        consequence="Their referrals, commissions, and portal login are removed too."
+        onConfirm={handleBulkDelete}
+        onClear={() => setSelectedIds([])}
+      />
+
       {loading ? (
         <div className="animate-pulse text-gray-500 py-12 text-center">Loading agents...</div>
       ) : (
@@ -100,6 +129,9 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th className="p-4 w-10">
+                  <input type="checkbox" checked={agents.length > 0 && selectedIds.length === agents.length} onChange={toggleSelectAll} className="w-4 h-4 accent-[var(--color-primary)]" aria-label="Select all agents" />
+                </th>
                 <th className="p-4 font-bold text-gray-600 text-sm">Agent ID</th>
                 <th className="p-4 font-bold text-gray-600 text-sm">Name</th>
                 <th className="p-4 font-bold text-gray-600 text-sm">Contact</th>
@@ -111,7 +143,10 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
             </thead>
             <tbody className="divide-y divide-gray-50">
               {agents.map(a => (
-                <tr key={a.id} className="hover:bg-gray-50">
+                <tr key={a.id} className={`hover:bg-gray-50 ${selectedIds.includes(a.id) ? 'bg-green-50/50' : ''}`}>
+                  <td className="p-4">
+                    <input type="checkbox" checked={selectedIds.includes(a.id)} onChange={() => toggleSelected(a.id)} className="w-4 h-4 accent-[var(--color-primary)]" aria-label={`Select ${a.fullName}`} />
+                  </td>
                   <td className="p-4 font-mono text-sm font-bold text-gray-900">{a.agentSerial}</td>
                   <td className="p-4 font-bold text-gray-900">{a.fullName}</td>
                   <td className="p-4 text-sm text-gray-600">
