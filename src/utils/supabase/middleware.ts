@@ -103,25 +103,19 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
-      // Chairman additionally gets read/act access into Director,
-      // Secretary, Customer Care, and Agent for direct oversight from the
-      // Executive Dashboard's Portal Access links — same pattern already
-      // used for /archive further down. Deliberately scoped to just these
-      // four (not Social Media Director, Admin Engineer, or Finance, and
-      // not the Super Admin console or the Customer self-service portal).
-      if (pathname.startsWith('/director') && role !== 'Director' && role !== 'Chairman') {
+      if (pathname.startsWith('/director') && role !== 'Director') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/secretary') && role !== 'Secretary' && role !== 'Chairman') {
+      if (pathname.startsWith('/secretary') && role !== 'Secretary') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/customer-care') && role !== 'Customer Care' && role !== 'Chairman') {
+      if (pathname.startsWith('/customer-care') && role !== 'Customer Care') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)
@@ -151,7 +145,7 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
       }
 
-      if (pathname.startsWith('/agent') && role !== 'Agent' && role !== 'Chairman') {
+      if (pathname.startsWith('/agent') && role !== 'Agent') {
         const url = request.nextUrl.clone()
         url.pathname = portalPath || '/portal'
         return NextResponse.redirect(url)

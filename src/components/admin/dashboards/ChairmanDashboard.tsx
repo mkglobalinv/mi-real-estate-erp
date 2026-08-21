@@ -3,21 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { Application, Customer } from '@/lib/types';
-import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle, Eye, MessageCircle, Headphones, UserCheck } from 'lucide-react';
+import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, Activity, CheckCircle, Eye, MessageCircle, UserCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
-
-// Direct oversight access into 4 of the staff portals — Chairman is
-// allowed through their route gates in middleware.ts alongside each
-// portal's own role. Deliberately scoped to just these four (not Social
-// Media Director, Admin Engineer, or Finance, and not the Super Admin
-// console or the Customer self-service portal).
-const PORTAL_LINKS: Array<{ href: string; label: string; icon: typeof Briefcase }> = [
-  { href: '/director', label: 'Director', icon: Briefcase },
-  { href: '/secretary', label: 'Secretary', icon: FileText },
-  { href: '/customer-care', label: 'Customer Care', icon: Headphones },
-  { href: '/agent', label: 'Agent Portal', icon: UserCheck },
-];
 
 export default function ChairmanDashboard() {
   const [documents, setDocuments] = useState<any[]>([]);
@@ -25,6 +13,7 @@ export default function ChairmanDashboard() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [revenue, setRevenue] = useState<any>({ monthly: 0, total: 0 });
   const [qualifierStats, setQualifierStats] = useState({ visits: 0, submissions: 0 });
+  const [agentCount, setAgentCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,18 +22,20 @@ export default function ChairmanDashboard() {
 
   async function loadData() {
     try {
-      const [allDocs, allCustomers, allRevenue, allApps, landingStats] = await Promise.all([
+      const [allDocs, allCustomers, allRevenue, allApps, landingStats, allAgents] = await Promise.all([
         (api as any).getDocuments ? (api as any).getDocuments() : Promise.resolve([]),
         api.getCustomers(),
         api.getRevenueReports(),
         api.getApplications(),
-        api.getQualifierLandingStats()
+        api.getQualifierLandingStats(),
+        api.getAgents()
       ]);
       setDocuments(allDocs);
       setCustomers(allCustomers);
       setRevenue(allRevenue);
       setApplications(allApps);
       setQualifierStats(landingStats);
+      setAgentCount(allAgents.length);
     } catch (err) {
       toast.error('Failed to load Chairman Dashboard data');
     } finally {
@@ -102,26 +93,8 @@ export default function ChairmanDashboard() {
   return (
     <div className="mb-12 space-y-8">
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Portal Access</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {PORTAL_LINKS.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="group bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:border-[var(--color-primary)] hover:shadow-md transition-all flex flex-col items-center text-center gap-2"
-            >
-              <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-green-50 flex items-center justify-center transition-colors">
-                <Icon className="w-5 h-5 text-gray-500 group-hover:text-[var(--color-primary)] transition-colors" />
-              </div>
-              <span className="text-xs font-bold text-gray-700 group-hover:text-[var(--color-primary)] transition-colors">{label}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      <div>
         <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Executive Reports</h2>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 shadow-sm border border-green-200 col-span-2">
             <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-6 h-6 text-green-700"/><span className="text-sm font-bold text-green-800 uppercase">Monthly Revenue</span></div>
             <h3 className="text-4xl font-extrabold text-green-900">₦{monthlyRevenue.toLocaleString()}</h3>
@@ -138,6 +111,11 @@ export default function ChairmanDashboard() {
             <div className="flex items-center gap-2 mb-2"><UsersIcon className="w-5 h-5 text-blue-500"/><span className="text-sm font-bold text-gray-500 uppercase">Customers</span></div>
             <h3 className="text-3xl font-extrabold">{activeCustomers}</h3>
           </div>
+          <Link href="/chairman/agents" className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:border-[var(--color-primary)] hover:shadow-md transition-all block">
+            <div className="flex items-center gap-2 mb-2"><UserCheck className="w-5 h-5 text-teal-600"/><span className="text-sm font-bold text-gray-500 uppercase">Agents</span></div>
+            <h3 className="text-3xl font-extrabold">{agentCount}</h3>
+            <p className="text-xs text-[var(--color-primary)] font-bold mt-1">Manage &rarr;</p>
+          </Link>
         </div>
       </div>
 
