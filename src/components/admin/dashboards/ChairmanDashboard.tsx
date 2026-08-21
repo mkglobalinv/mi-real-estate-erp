@@ -3,9 +3,25 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { Application, Customer } from '@/lib/types';
-import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle, Eye, MessageCircle } from 'lucide-react';
+import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle, Eye, MessageCircle, Headphones, Megaphone, Wrench, Wallet, UserCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
+
+// Direct oversight access into the 7 staff portals — Chairman is allowed
+// through their route gates in middleware.ts alongside each portal's own
+// role. Deliberately excludes the Super Admin console (/admin, wider
+// surface with legacy destructive screens) and the Customer self-service
+// portal (/portal, matched by email — wouldn't show anything meaningful
+// for the Chairman's own login anyway).
+const PORTAL_LINKS: Array<{ href: string; label: string; icon: typeof Briefcase }> = [
+  { href: '/director', label: 'Director', icon: Briefcase },
+  { href: '/secretary', label: 'Secretary', icon: FileText },
+  { href: '/customer-care', label: 'Customer Care', icon: Headphones },
+  { href: '/social-media-director', label: 'Social Media', icon: Megaphone },
+  { href: '/admin-engineer', label: 'Admin Engineer', icon: Wrench },
+  { href: '/finance', label: 'Finance', icon: Wallet },
+  { href: '/agent', label: 'Agent Portal', icon: UserCheck },
+];
 
 export default function ChairmanDashboard() {
   const [documents, setDocuments] = useState<any[]>([]);
@@ -89,6 +105,24 @@ export default function ChairmanDashboard() {
 
   return (
     <div className="mb-12 space-y-8">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Portal Access</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {PORTAL_LINKS.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="group bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:border-[var(--color-primary)] hover:shadow-md transition-all flex flex-col items-center text-center gap-2"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-green-50 flex items-center justify-center transition-colors">
+                <Icon className="w-5 h-5 text-gray-500 group-hover:text-[var(--color-primary)] transition-colors" />
+              </div>
+              <span className="text-xs font-bold text-gray-700 group-hover:text-[var(--color-primary)] transition-colors">{label}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <div>
         <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Executive Reports</h2>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
