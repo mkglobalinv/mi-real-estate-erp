@@ -3,23 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { Application, Customer } from '@/lib/types';
-import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle, Eye, MessageCircle, Headphones, Megaphone, Wrench, Wallet, UserCheck } from 'lucide-react';
+import { TrendingUp, FileCheck, Briefcase, Users as UsersIcon, FileText, Activity, CheckCircle, Eye, MessageCircle, Headphones, UserCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 
-// Direct oversight access into the 7 staff portals — Chairman is allowed
-// through their route gates in middleware.ts alongside each portal's own
-// role. Deliberately excludes the Super Admin console (/admin, wider
-// surface with legacy destructive screens) and the Customer self-service
-// portal (/portal, matched by email — wouldn't show anything meaningful
-// for the Chairman's own login anyway).
+// Direct oversight access into 4 of the staff portals — Chairman is
+// allowed through their route gates in middleware.ts alongside each
+// portal's own role. Deliberately scoped to just these four (not Social
+// Media Director, Admin Engineer, or Finance, and not the Super Admin
+// console or the Customer self-service portal).
 const PORTAL_LINKS: Array<{ href: string; label: string; icon: typeof Briefcase }> = [
   { href: '/director', label: 'Director', icon: Briefcase },
   { href: '/secretary', label: 'Secretary', icon: FileText },
   { href: '/customer-care', label: 'Customer Care', icon: Headphones },
-  { href: '/social-media-director', label: 'Social Media', icon: Megaphone },
-  { href: '/admin-engineer', label: 'Admin Engineer', icon: Wrench },
-  { href: '/finance', label: 'Finance', icon: Wallet },
   { href: '/agent', label: 'Agent Portal', icon: UserCheck },
 ];
 
@@ -107,7 +103,7 @@ export default function ChairmanDashboard() {
     <div className="mb-12 space-y-8">
       <div>
         <h2 className="text-xl font-bold text-gray-900 mb-4 border-b pb-2">Portal Access</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {PORTAL_LINKS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
