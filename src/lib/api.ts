@@ -1087,6 +1087,17 @@ export const api = {
     };
   },
 
+  // --- PRODUCTION DATA RESET (Chairman-only, see schema.sql section 37) ---
+  // Calls the reset_operational_data() Postgres function via the normal
+  // authenticated browser client, so it always runs against whatever
+  // database this app is actually configured for. The function itself
+  // re-checks the caller is Chairman/Super Admin server-side.
+  async resetOperationalData(): Promise<Array<{ table_name: string; deleted_count: number }>> {
+    const { data, error } = await getSupabase().rpc('reset_operational_data');
+    if (error) throw new Error(error.message);
+    return (data || []) as Array<{ table_name: string; deleted_count: number }>;
+  },
+
   // Submissions for a campaign, with their lead score attached — used by
   // the campaign analytics/leads view.
   async getCampaignSubmissions(campaignId: string): Promise<unknown[]> {

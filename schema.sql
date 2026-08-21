@@ -1054,3 +1054,155 @@ CREATE TABLE IF NOT EXISTS public.qualifier_landing_events (
     event_type TEXT NOT NULL CHECK (event_type IN ('page_view', 'submission')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ============================================================================
+-- 37. PRODUCTION DATA RESET FUNCTION
+-- One-time-use (but safely re-runnable) Chairman/Super-Admin-only function
+-- that clears operational data (customers, applications, agents, leads,
+-- and every record that exists only because of them) so production can
+-- start with zero of each, while leaving the estate/pricing/system
+-- configuration entirely untouched. Called from the Chairman Portal's
+-- System Reset page (src/features/system-reset/page.tsx) via
+-- supabase.rpc('reset_operational_data') using the browser's own
+-- authenticated Supabase client — the exact same client every other
+-- Chairman action already uses, so this reaches whatever database the
+-- live app is actually configured against (no separate service-role key
+-- or admin API route needed).
+--
+-- SECURITY DEFINER means this runs with the privileges of the function's
+-- owner (able to bypass RLS, matching what a raw SQL Editor script could
+-- already do), but the explicit role check below is the real gate: only a
+-- caller whose own profiles.role is Chairman or Super Admin can invoke it
+-- successfully — identical in spirit to every other Chairman-only RLS
+-- policy elsewhere in this schema (see section 34.7).
+--
+-- Runs as a single Postgres transaction: if any statement fails, nothing
+-- above it is kept — there is no partial/half-applied state.
+--
+-- Deletion order matches the manually-verified dependency chain: agent
+-- commissions/referrals are cleared first because agent_commissions and
+-- agent_referrals use ON DELETE RESTRICT on agent_id (schema section 34),
+-- then allocations (ON DELETE RESTRICT on customer_id), then every
+-- customer-scoped record, then customers/agents themselves, and finally
+-- the underlying Supabase Auth login for every Customer/Agent account
+-- (profiles.id -> auth.users(id) ON DELETE CASCADE means deleting the
+-- auth.users row also removes their public.profiles row and, via
+-- notifications.user_id ON DELETE CASCADE, their notifications).
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.reset_operational_data()
+RETURNS TABLE(table_name TEXT, deleted_count BIGINT)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_count BIGINT;
+  v_customer_agent_ids UUID[];
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')
+  ) THEN
+    RAISE EXCEPTION 'Not authorized to reset operational data';
+  END IF;
+
+  DELETE FROM public.agent_commissions;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'agent_commissions'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.agent_referrals;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'agent_referrals'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.lead_activities;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'lead_activities'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.lead_followups;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'lead_followups'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.lead_notes;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'lead_notes'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.lead_scores;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'lead_scores'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.lead_answers;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'lead_answers'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.lead_submissions;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'lead_submissions'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.leads;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'leads'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.allocations;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'allocations'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.ledger_transactions WHERE customer_id IS NOT NULL;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'ledger_transactions'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.installments;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'installments'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.payment_proofs;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'payment_proofs'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.documents;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'documents'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.customer_care_tickets;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'customer_care_tickets'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.easy_buy_accounts;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'easy_buy_accounts'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.applications;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'applications'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.customers;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'customers'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.agents;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'agents'; deleted_count := v_count; RETURN NEXT;
+
+  -- Capture Customer/Agent auth user ids, then remove the actual Supabase
+  -- Auth login. This cascades and removes their public.profiles row (and,
+  -- via notifications.user_id ON DELETE CASCADE, their notifications) too.
+  SELECT array_agg(id) INTO v_customer_agent_ids
+  FROM public.profiles WHERE role IN ('Customer', 'Agent');
+
+  IF v_customer_agent_ids IS NOT NULL THEN
+    DELETE FROM auth.users WHERE id = ANY(v_customer_agent_ids);
+  END IF;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'auth_users_customer_or_agent'; deleted_count := v_count; RETURN NEXT;
+
+  -- Safety-net: catches any Customer/Agent profile row that somehow had no
+  -- matching auth.users row. No-op if the step above already cleared it.
+  DELETE FROM public.profiles WHERE role IN ('Customer', 'Agent');
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'profiles_orphaned_customer_or_agent'; deleted_count := v_count; RETURN NEXT;
+
+  RETURN;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.reset_operational_data() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.reset_operational_data() TO authenticated;
