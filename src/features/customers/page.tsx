@@ -7,6 +7,7 @@ import { Customer, Project } from '@/lib/types';
 import { Users, Search, ChevronRight, CheckCircle2, Clock, PlusCircle, X, Copy, Check, UploadCloud, FileText, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
+import BulkDeleteBar from '@/components/admin/BulkDeleteBar';
 
 // Fixed plot plans — price/deposit/term are set exactly as configured by
 // the Chairman, not typed in by hand each time. "Custom" is kept as an
@@ -27,6 +28,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
   const [successData, setSuccessData] = useState<{name: string, username: string, tempPass: string} | null>(null);
   const [copied, setCopied] = useState(false);
   const [isCustomPlot, setIsCustomPlot] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     // Section A
@@ -146,13 +148,32 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
   };
 
   const filteredCustomers = customers.filter(c => {
-    const matchesSearch = searchTerm === '' || 
-      c.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch = searchTerm === '' ||
+      c.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.ref?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.phone.includes(searchTerm);
     const matchesStatus = statusFilter === '' || c.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.length === filteredCustomers.length ? [] : filteredCustomers.map(c => c.id));
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await api.deleteCustomers(selectedIds);
+      toast.success(`${selectedIds.length} customer(s) deleted`);
+      setSelectedIds([]);
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete customers');
+    }
+  };
 
   return (
     <div className="pb-20">
@@ -168,6 +189,14 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
           <PlusCircle className="w-5 h-5" /> Create New Customer
         </button>
       </div>
+
+      <BulkDeleteBar
+        count={selectedIds.length}
+        itemLabel="customer"
+        consequence="Their applications, payments, documents, and portal login are removed too."
+        onConfirm={handleBulkDelete}
+        onClear={() => setSelectedIds([])}
+      />
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
@@ -199,6 +228,9 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
               <tr>
+                <th className="p-4 w-10">
+                  <input type="checkbox" checked={filteredCustomers.length > 0 && selectedIds.length === filteredCustomers.length} onChange={toggleSelectAll} className="w-4 h-4 accent-[var(--color-primary)]" aria-label="Select all customers" />
+                </th>
                 <th className="p-4">Customer</th>
                 <th className="p-4">Contact</th>
                 <th className="p-4">Status</th>
@@ -208,10 +240,13 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredCustomers.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-gray-500">No customers found.</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-gray-500">No customers found.</td></tr>
               ) : (
                 filteredCustomers.map((cust) => (
-                  <tr key={cust.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={cust.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.includes(cust.id) ? 'bg-green-50/50' : ''}`}>
+                    <td className="p-4">
+                      <input type="checkbox" checked={selectedIds.includes(cust.id)} onChange={() => toggleSelected(cust.id)} className="w-4 h-4 accent-[var(--color-primary)]" aria-label={`Select ${cust.fullName}`} />
+                    </td>
                     <td className="p-4">
                       <p className="font-bold text-gray-900">{cust.fullName}</p>
                       <p className="text-[10px] text-[var(--color-primary)] font-mono font-bold mt-0.5">{cust.ref}</p>

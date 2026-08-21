@@ -5,6 +5,8 @@ import { api } from '@/lib/api';
 import { Banner } from '@/lib/types';
 import { createClient } from '@/utils/supabase/client';
 import { Image as ImageIcon, Plus, Edit2, Trash2, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import BulkDeleteBar from '@/components/admin/BulkDeleteBar';
 
 const emptyBanner: Partial<Banner> = { isActive: true, orderIndex: 0 };
 
@@ -14,6 +16,7 @@ export default function BannerManager({ basePath = '/admin', params: routeParams
   const [current, setCurrent] = useState<Partial<Banner>>(emptyBanner);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadData();
@@ -61,6 +64,25 @@ export default function BannerManager({ basePath = '/admin', params: routeParams
   const toggleStatus = async (banner: Banner) => {
     await api.saveBanner({ ...banner, isActive: !banner.isActive });
     loadData();
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => prev.length === banners.length ? [] : banners.map(b => b.id));
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await api.deleteBanners(selectedIds);
+      toast.success(`${selectedIds.length} banner(s) deleted`);
+      setSelectedIds([]);
+      loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete banners');
+    }
   };
 
   // datetime-local inputs need "YYYY-MM-DDTHH:mm" with no timezone suffix.
@@ -140,10 +162,20 @@ export default function BannerManager({ basePath = '/admin', params: routeParams
         </div>
       )}
 
+      <BulkDeleteBar
+        count={selectedIds.length}
+        itemLabel="banner"
+        onConfirm={handleBulkDelete}
+        onClear={() => setSelectedIds([])}
+      />
+
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="p-4 w-10">
+                <input type="checkbox" checked={banners.length > 0 && selectedIds.length === banners.length} onChange={toggleSelectAll} className="w-4 h-4 accent-[var(--color-primary)]" aria-label="Select all banners" />
+              </th>
               <th className="p-4 font-bold text-gray-600 text-sm">Image</th>
               <th className="p-4 font-bold text-gray-600 text-sm">Title</th>
               <th className="p-4 font-bold text-gray-600 text-sm">Destination</th>
@@ -154,7 +186,10 @@ export default function BannerManager({ basePath = '/admin', params: routeParams
           </thead>
           <tbody className="divide-y divide-gray-50">
             {banners.map(b => (
-              <tr key={b.id} className="hover:bg-gray-50">
+              <tr key={b.id} className={`hover:bg-gray-50 ${selectedIds.includes(b.id) ? 'bg-green-50/50' : ''}`}>
+                <td className="p-4">
+                  <input type="checkbox" checked={selectedIds.includes(b.id)} onChange={() => toggleSelected(b.id)} className="w-4 h-4 accent-[var(--color-primary)]" aria-label={`Select ${b.title || 'banner'}`} />
+                </td>
                 <td className="p-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={b.imageUrl} alt={b.title || 'Banner'} className="h-12 w-24 object-cover rounded-lg border border-gray-100 bg-gray-50" />

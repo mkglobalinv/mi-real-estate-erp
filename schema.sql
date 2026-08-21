@@ -1206,3 +1206,120 @@ $$;
 
 REVOKE ALL ON FUNCTION public.reset_operational_data() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reset_operational_data() TO authenticated;
+
+-- ============================================================================
+-- 38. CHAIRMAN BULK DELETE (scoped, selective — companion to section 37)
+-- Section 37 wipes every operational record. These two functions delete
+-- only the specific rows a Chairman selects via checkbox on the Customers
+-- and Agents list pages. Same authorization pattern (in-function role
+-- check), same atomic-transaction guarantee, but scoped by an id array
+-- instead of clearing whole tables.
+--
+-- Deliberately narrower than section 37's cascade: agent_referrals and
+-- ledger_transactions linked to a deleted customer are left in place with
+-- their FK nulled out (both already ON DELETE SET NULL) rather than
+-- deleted outright, since here only that one customer is going away, not
+-- the whole agent/financial history around them. Only the RESTRICT-
+-- blocking tables (agent_commissions, allocations) are explicitly cleared
+-- first; every CASCADE child (applications, easy_buy_accounts +
+-- installments, payment_proofs, documents, customer_care_tickets) is left
+-- to the existing FK behavior.
+--
+-- Campaigns and Banners need no equivalent function: neither table has
+-- RLS gaps or RESTRICT-blocking children, so their bulk delete is a plain
+-- `.in('id', ids)` call from the browser client (see api.ts).
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.delete_customers(customer_ids UUID[])
+RETURNS TABLE(table_name TEXT, deleted_count BIGINT)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_count BIGINT;
+  v_profile_ids UUID[];
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')
+  ) THEN
+    RAISE EXCEPTION 'Not authorized to delete customers';
+  END IF;
+
+  DELETE FROM public.agent_commissions WHERE customer_id = ANY(customer_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'agent_commissions'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.allocations WHERE customer_id = ANY(customer_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'allocations'; deleted_count := v_count; RETURN NEXT;
+
+  -- Capture linked portal-login ids before the customer rows go, so the
+  -- login can be removed too — no orphaned auth account left with nothing
+  -- to sign into.
+  SELECT array_agg(profile_id) INTO v_profile_ids
+  FROM public.customers WHERE id = ANY(customer_ids) AND profile_id IS NOT NULL;
+
+  DELETE FROM public.customers WHERE id = ANY(customer_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'customers'; deleted_count := v_count; RETURN NEXT;
+
+  IF v_profile_ids IS NOT NULL THEN
+    DELETE FROM auth.users WHERE id = ANY(v_profile_ids);
+  END IF;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'auth_users_linked'; deleted_count := v_count; RETURN NEXT;
+
+  RETURN;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_customers(UUID[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_customers(UUID[]) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.delete_agents(agent_ids UUID[])
+RETURNS TABLE(table_name TEXT, deleted_count BIGINT)
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_count BIGINT;
+  v_profile_ids UUID[];
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')
+  ) THEN
+    RAISE EXCEPTION 'Not authorized to delete agents';
+  END IF;
+
+  -- agent_referrals.agent_id is NOT NULL (unlike its customer_id, which is
+  -- nullable), so a referral can't survive its agent being deleted — it is
+  -- deleted outright here, not just unlinked.
+  DELETE FROM public.agent_commissions WHERE agent_id = ANY(agent_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'agent_commissions'; deleted_count := v_count; RETURN NEXT;
+
+  DELETE FROM public.agent_referrals WHERE agent_id = ANY(agent_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'agent_referrals'; deleted_count := v_count; RETURN NEXT;
+
+  SELECT array_agg(profile_id) INTO v_profile_ids
+  FROM public.agents WHERE id = ANY(agent_ids) AND profile_id IS NOT NULL;
+
+  DELETE FROM public.agents WHERE id = ANY(agent_ids);
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'agents'; deleted_count := v_count; RETURN NEXT;
+
+  IF v_profile_ids IS NOT NULL THEN
+    DELETE FROM auth.users WHERE id = ANY(v_profile_ids);
+  END IF;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  table_name := 'auth_users_linked'; deleted_count := v_count; RETURN NEXT;
+
+  RETURN;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_agents(UUID[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_agents(UUID[]) TO authenticated;

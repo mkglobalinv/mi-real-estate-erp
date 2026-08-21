@@ -161,6 +161,15 @@ export const api = {
     if (error) throw new Error(error.message);
   },
 
+  // Chairman-only bulk delete (see schema.sql section 38) — clears the
+  // RESTRICT-blocking tables first, deletes the customers, then their
+  // linked portal logins, all in one transaction.
+  async deleteCustomers(ids: string[]): Promise<Array<{ table_name: string; deleted_count: number }>> {
+    const { data, error } = await getSupabase().rpc('delete_customers', { customer_ids: ids });
+    if (error) throw new Error(error.message);
+    return (data || []) as Array<{ table_name: string; deleted_count: number }>;
+  },
+
   // --- EASY BUY ACCOUNTS ---
   async getEasyBuyAccounts(): Promise<EasyBuyAccount[]> {
     try {
@@ -627,6 +636,14 @@ export const api = {
 
   async deleteCampaign(id: string): Promise<void> {
     const { error } = await getSupabase().from('campaigns').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // Chairman-only bulk delete. No RESTRICT-blocking children on campaigns
+  // — every dependent table (questions/media/faqs/packages/analytics/
+  // lead_submissions) cascades automatically.
+  async deleteCampaigns(ids: string[]): Promise<void> {
+    const { error } = await getSupabase().from('campaigns').delete().in('id', ids);
     if (error) throw error;
   },
 
@@ -1434,6 +1451,12 @@ export const api = {
     if (error) throw new Error(error.message);
   },
 
+  // Chairman-only bulk delete. banners has no RESTRICT-blocking children.
+  async deleteBanners(ids: string[]): Promise<void> {
+    const { error } = await getSupabase().from('banners').delete().in('id', ids);
+    if (error) throw new Error(error.message);
+  },
+
   // --- AGENT PORTAL: AGENTS ---
   // `client` lets server-side routes (registration, which must use the
   // service-role key) reuse this same function, matching how
@@ -1482,6 +1505,15 @@ export const api = {
       .eq('id', id).select().single();
     if (error) throw new Error(error.message);
     return mapDbToAgent(data);
+  },
+
+  // Chairman-only bulk delete (see schema.sql section 38) — clears the
+  // RESTRICT-blocking tables first, deletes the agents, then their linked
+  // portal logins, all in one transaction.
+  async deleteAgents(ids: string[]): Promise<Array<{ table_name: string; deleted_count: number }>> {
+    const { data, error } = await getSupabase().rpc('delete_agents', { agent_ids: ids });
+    if (error) throw new Error(error.message);
+    return (data || []) as Array<{ table_name: string; deleted_count: number }>;
   },
 
   // --- AGENT PORTAL: REFERRALS ---
