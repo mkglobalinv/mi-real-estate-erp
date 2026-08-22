@@ -7,7 +7,7 @@ import {
   Building2, LayoutDashboard, Users, MapPin, PlusCircle,
   Settings, Activity, Calendar, Wallet, CheckSquare, FolderGit2,
   Menu, X, Bell, ExternalLink, ChevronDown, Shield, KanbanSquare, Megaphone,
-  Image as ImageIcon, UserCheck, Banknote, AlertTriangle
+  Image as ImageIcon, UserCheck, Banknote, AlertTriangle, FolderOpen
 } from 'lucide-react';
 import GlobalSearch from '@/components/admin/GlobalSearch';
 import { RoleProvider, useRole } from '@/components/providers/RoleProvider';
@@ -159,6 +159,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             <Link href="/chairman/allocations" onClick={closeMenu} className={linkClass('/chairman/allocations')}>
               <MapPin className={iconClass('/chairman/allocations')} />
               Allocations
+            </Link>
+            <Link href="/chairman/documents" onClick={closeMenu} className={linkClass('/chairman/documents')}>
+              <FolderOpen className={iconClass('/chairman/documents')} />
+              Document Center
             </Link>
             <Link href="/chairman/reports" onClick={closeMenu} className={linkClass('/chairman/reports')}>
               <Activity className={iconClass('/chairman/reports')} />
