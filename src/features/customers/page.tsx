@@ -76,16 +76,33 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
         setUploadingDocs(true);
         const supabase = createClient();
         for (const file of documentFiles) {
-          try {
-            const ext = file.name.split('.').pop();
-            const path = `customer-docs/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-            const { error: storageError } = await supabase.storage.from('payment-proofs').upload(path, file);
-            if (storageError) throw storageError;
-            const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
-            if (!urlData?.publicUrl) throw new Error('Failed to generate file URL');
-            customerDocuments.push({ title: file.name.replace(/\.[^.]+$/, ''), fileUrl: urlData.publicUrl });
-          } catch (uploadErr: any) {
-            toast.error(`Failed to upload ${file.name}: ${uploadErr.message || 'unknown error'}`);
+          const ext = file.name.split('.').pop();
+          const path = `customer-docs/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+          // "Failed to fetch" here is a raw browser network failure (the
+          // request never reached Supabase at all), not a Supabase-returned
+          // permission/validation error — a genuine blip on a weak/roaming
+          // connection is the common cause on mobile. Worth a couple of
+          // quick retries before giving up, since a retried logical error
+          // (e.g. an RLS rejection) just fails again identically at no real
+          // extra cost.
+          let lastErr: unknown;
+          let uploaded = false;
+          for (let attempt = 1; attempt <= 3 && !uploaded; attempt++) {
+            try {
+              const { error: storageError } = await supabase.storage.from('payment-proofs').upload(path, file);
+              if (storageError) throw storageError;
+              const { data: urlData } = supabase.storage.from('payment-proofs').getPublicUrl(path);
+              if (!urlData?.publicUrl) throw new Error('Failed to generate file URL');
+              customerDocuments.push({ title: file.name.replace(/\.[^.]+$/, ''), fileUrl: urlData.publicUrl });
+              uploaded = true;
+            } catch (uploadErr) {
+              lastErr = uploadErr;
+              if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 700));
+            }
+          }
+          if (!uploaded) {
+            const message = lastErr instanceof Error ? lastErr.message : 'unknown error';
+            toast.error(`Failed to upload ${file.name}: ${message}`);
           }
         }
         setUploadingDocs(false);
