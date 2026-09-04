@@ -25,7 +25,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [successData, setSuccessData] = useState<{name: string, username: string, tempPass: string} | null>(null);
+  const [successData, setSuccessData] = useState<{name: string, phone: string, username: string, tempPass: string} | null>(null);
   const [copied, setCopied] = useState(false);
   const [isCustomPlot, setIsCustomPlot] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -131,6 +131,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
 
       setSuccessData({
         name: formData.fullName,
+        phone: formData.phone,
         username: emailToUse,
         tempPass: authData.tempPassword
       });
@@ -146,7 +147,7 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
 
   const copyCredentials = () => {
     if (!successData) return;
-    const text = `Customer Portal Credentials\nURL: https://mirealestate.com/login\nUsername: ${successData.username}\nPassword: ${successData.tempPass}`;
+    const text = `Customer Portal Credentials\nName: ${successData.name}\nPhone: ${successData.phone}\nURL: https://mirealestate.com/login\nUsername: ${successData.username}\nPassword: ${successData.tempPass}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -323,9 +324,15 @@ export default function CustomersPage({ basePath = '/admin', params: routeParams
                   <div className="bg-gray-900 text-white p-6 rounded-2xl max-w-sm mx-auto text-left shadow-xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
                     <div className="relative z-10">
+                      <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Name</p>
+                      <p className="font-mono text-lg mb-4 select-all">{successData.name}</p>
+
+                      <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Phone Number</p>
+                      <p className="font-mono text-lg mb-4 select-all">{successData.phone}</p>
+
                       <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Username</p>
                       <p className="font-mono text-lg mb-4 select-all">{successData.username}</p>
-                      
+
                       <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">Temporary Password</p>
                       <p className="font-mono text-lg text-[var(--color-gold)] select-all">{successData.tempPass}</p>
                     </div>
