@@ -20,9 +20,9 @@ function getSupabaseAdmin() {
 
 export async function POST(request: Request) {
   try {
-    const { fullName, phone, email, password, bankName, accountNumber, accountName } = await request.json();
+    const { fullName, phone, email, password, address, companyName, additionalInfo, bankName, accountNumber, accountName } = await request.json();
 
-    if (!fullName || !phone || !email || !password || !bankName || !accountNumber || !accountName) {
+    if (!fullName || !phone || !email || !password || !address || !bankName || !accountNumber || !accountName) {
       return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
     }
     if (password.length < 8) {
@@ -62,6 +62,9 @@ export async function POST(request: Request) {
       fullName,
       phone,
       email,
+      address,
+      companyName: companyName || undefined,
+      additionalInfo: additionalInfo || undefined,
       bankName,
       accountNumber,
       accountName,
