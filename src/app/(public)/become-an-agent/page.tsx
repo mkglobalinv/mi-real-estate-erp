@@ -187,23 +187,25 @@ export default function BecomeAnAgentPage() {
           </div>
         </div>
 
-        <div className="relative w-full aspect-[4/5] sm:aspect-[16/9] max-h-[520px]">
-          <Image
-            src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80"
-            alt="Agent promoting M.I. Real Estate on a smartphone"
-            fill
-            priority
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
-            <div className="max-w-md mx-auto sm:max-w-lg flex flex-col sm:flex-row gap-3">
-              <button onClick={scrollToForm} className="flex-1 bg-white text-[var(--color-primary-dark)] font-bold py-3.5 px-6 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all inline-flex items-center justify-center gap-2">
-                Become an Agent <ArrowRight className="w-4 h-4" />
-              </button>
-              <button onClick={scrollToHowItWorks} className="flex-1 bg-white/10 backdrop-blur-sm text-white font-bold py-3.5 px-6 rounded-xl border border-white/40 hover:bg-white/20 transition-all inline-flex items-center justify-center gap-2">
-                <Play className="w-4 h-4" /> How It Works
-              </button>
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="relative w-full max-w-2xl mx-auto aspect-[4/5] sm:aspect-[4/3] rounded-3xl overflow-hidden shadow-xl">
+            <Image
+              src="/images/become-agent-hero.jpg"
+              alt="M.I. Real Estate Agent"
+              fill
+              priority
+              className="object-cover object-top"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-primary-dark)]/80 via-black/10 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button onClick={scrollToForm} className="flex-1 bg-white text-[var(--color-primary-dark)] font-bold py-3.5 px-6 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all inline-flex items-center justify-center gap-2">
+                  Become an Agent <ArrowRight className="w-4 h-4" />
+                </button>
+                <button onClick={scrollToHowItWorks} className="flex-1 bg-white/10 backdrop-blur-sm text-white font-bold py-3.5 px-6 rounded-xl border border-white/40 hover:bg-white/20 transition-all inline-flex items-center justify-center gap-2">
+                  <Play className="w-4 h-4" /> How It Works
+                </button>
+              </div>
             </div>
           </div>
         </div>
