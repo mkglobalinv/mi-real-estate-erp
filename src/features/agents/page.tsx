@@ -148,10 +148,14 @@ export default function AgentManager({ basePath = '/admin', params: routeParams 
                     <input type="checkbox" checked={selectedIds.includes(a.id)} onChange={() => toggleSelected(a.id)} className="w-4 h-4 accent-[var(--color-primary)]" aria-label={`Select ${a.fullName}`} />
                   </td>
                   <td className="p-4 font-mono text-sm font-bold text-gray-900">{a.agentSerial}</td>
-                  <td className="p-4 font-bold text-gray-900">{a.fullName}</td>
+                  <td className="p-4 font-bold text-gray-900">
+                    {a.fullName}
+                    {a.companyName && <div className="text-xs font-medium text-gray-400 mt-0.5">{a.companyName}</div>}
+                  </td>
                   <td className="p-4 text-sm text-gray-600">
                     <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-gray-400" /> {a.phone}</div>
                     {a.email && <div className="text-xs text-gray-400 mt-0.5">{a.email}</div>}
+                    {a.address && <div className="text-xs text-gray-400 mt-0.5">{a.address}</div>}
                   </td>
                   <td className="p-4 text-sm text-gray-600">
                     <div className="flex items-center gap-1.5"><Landmark className="w-3.5 h-3.5 text-gray-400" /> {a.bankName}</div>

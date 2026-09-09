@@ -810,6 +810,9 @@ CREATE TABLE IF NOT EXISTS public.agents (
     full_name TEXT NOT NULL,
     phone TEXT NOT NULL,
     email TEXT,
+    address TEXT,
+    company_name TEXT,
+    additional_info TEXT,
     bank_name TEXT NOT NULL,
     account_number TEXT NOT NULL,
     account_name TEXT NOT NULL,
@@ -1323,3 +1326,17 @@ $$;
 
 REVOKE ALL ON FUNCTION public.delete_agents(UUID[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.delete_agents(UUID[]) TO authenticated;
+
+-- ============================================================================
+-- 39. AGENT PORTAL: EXTENDED PROFILE FIELDS
+-- The public "Become an Agent" landing page's registration form (see
+-- src/app/(public)/become-an-agent/page.tsx) collects Address (required),
+-- and Company/Business Name + Additional Information (both optional).
+-- Idempotent for production, where the agents table already exists from
+-- section 34.2 — new installs get these columns directly from that
+-- CREATE TABLE instead.
+-- ============================================================================
+
+ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS company_name TEXT;
+ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS additional_info TEXT;
