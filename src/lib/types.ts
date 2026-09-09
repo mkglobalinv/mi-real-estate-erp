@@ -432,6 +432,9 @@ export interface Agent {
   fullName: string;
   phone: string;
   email?: string;
+  address?: string;
+  companyName?: string;
+  additionalInfo?: string;
   bankName: string;
   accountNumber: string;
   accountName: string;
