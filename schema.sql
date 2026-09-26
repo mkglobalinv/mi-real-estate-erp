@@ -1340,3 +1340,43 @@ GRANT EXECUTE ON FUNCTION public.delete_agents(UUID[]) TO authenticated;
 ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS address TEXT;
 ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS company_name TEXT;
 ALTER TABLE public.agents ADD COLUMN IF NOT EXISTS additional_info TEXT;
+
+-- ============================================================================
+-- 40. AGENT LANDING PAGE CONTENT
+-- Single-row JSON store for the editable text, hero image, displayed
+-- commission rate and featured-estate details on the public "Become an
+-- Agent" page (src/app/(public)/become-an-agent). Edited by the Chairman at
+-- /chairman/agent-page; field shape is AgentPageContent in
+-- src/lib/agent-page-content.ts. Hero images are uploaded to the existing
+-- public "banners" bucket (section 32/33).
+-- Public read (the landing page is anonymous); only Chairman / Super Admin
+-- may write.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.agent_page_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    content JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.agent_page_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "agent_page_settings_select_all" ON public.agent_page_settings;
+CREATE POLICY "agent_page_settings_select_all" ON public.agent_page_settings
+  FOR SELECT
+  TO anon, authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "agent_page_settings_insert_chairman" ON public.agent_page_settings;
+CREATE POLICY "agent_page_settings_insert_chairman" ON public.agent_page_settings
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')));
+
+DROP POLICY IF EXISTS "agent_page_settings_update_chairman" ON public.agent_page_settings;
+CREATE POLICY "agent_page_settings_update_chairman" ON public.agent_page_settings
+  FOR UPDATE
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('Chairman', 'Super Admin')));

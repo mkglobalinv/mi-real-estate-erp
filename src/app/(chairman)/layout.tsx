@@ -130,6 +130,10 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
               <UserCheck className={iconClass('/chairman/agents')} />
               Agent Management
             </Link>
+            <Link href="/chairman/agent-page" onClick={closeMenu} className={linkClass('/chairman/agent-page')}>
+              <Megaphone className={iconClass('/chairman/agent-page')} />
+              Agent Landing Page
+            </Link>
             <Link href="/chairman/commission-rules" onClick={closeMenu} className={linkClass('/chairman/commission-rules')}>
               <Banknote className={iconClass('/chairman/commission-rules')} />
               Commission Rules

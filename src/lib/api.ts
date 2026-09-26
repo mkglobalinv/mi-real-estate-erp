@@ -3,6 +3,7 @@ import { mapDbToProperty, mapPropertyToDb, mapDbToProject, mapProjectToDb, mapDb
 import { PropertyListing, Project, Customer, Application, Lead, Campaign, CampaignQuestion, CampaignFaq, CampaignMedia, EasyBuyAccount, Installment, PaymentProof, LedgerTransaction, Receipt, Allocation, InspectionBooking, Reservation, CustomerCareTicket, WebsiteEnquiry, Announcement, Banner, Agent, AgentReferral, CommissionRule, AgentCommission, Testimonial, OfficeInfo, Task, SearchAnalytics, Location, ApplicationFormTemplate, CampaignAiDraft, CampaignPackage } from './types';
 import { ActivityLog, Notification } from './models-extensions';
 import { generateCustomerRef, generateEasyBuyRef, generateBookingRef, generateReservationRef, generateLeadRef, generateTicketRef, generatePropertyRef, generateAllocationRef, generateAgentSerial, generateReferralRef } from './generators';
+import { AgentPageContent, withAgentPageDefaults } from './agent-page-content';
 import { DEFAULT_QUALIFICATION_QUESTIONS, DEFAULT_CONDITIONAL_QUESTION } from './defaultCampaignQuestions';
 
 // We use the browser client for the UI data layer
@@ -1819,6 +1820,30 @@ export const api = {
   async deleteWebsiteEnquiry(id: string): Promise<void> {
     const { error } = await getSupabase().from('website_enquiries').delete().eq('id', id);
     if (error) throw new Error(error.message);
+  },
+
+  // --- AGENT LANDING PAGE CONTENT ---
+  // Falls back to the built-in defaults if the row (or table) doesn't exist
+  // yet, so the public page always renders.
+  async getAgentPageContent(): Promise<AgentPageContent> {
+    const { data, error } = await getSupabase().from('agent_page_settings').select('content').eq('id', 1).maybeSingle();
+    if (error) {
+      console.warn('Failed to get agent page content:', error.message);
+      return withAgentPageDefaults(null);
+    }
+    return withAgentPageDefaults(data?.content as Partial<AgentPageContent> | undefined);
+  },
+
+  async saveAgentPageContent(content: AgentPageContent): Promise<AgentPageContent> {
+    const supabase = getSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase
+      .from('agent_page_settings')
+      .upsert({ id: 1, content, updated_by: user?.id ?? null, updated_at: new Date().toISOString() })
+      .select('content')
+      .single();
+    if (error) throw new Error(error.message);
+    return withAgentPageDefaults(data.content as Partial<AgentPageContent>);
   },
 
   // --- OFFICE INFO: UPDATE ---
