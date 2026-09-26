@@ -31,6 +31,20 @@ const EXAMPLE_DEPOSIT = 200000;
 const EXAMPLE_RATE = 0.6;
 const EXAMPLE_COMMISSION = EXAMPLE_DEPOSIT * EXAMPLE_RATE;
 
+// Featured estate from the current advert flyer (public/images/yarimawa-hills-flyer.jpg).
+// Prices and plans mirror the flyer; update both together when the advert changes.
+const FEATURED_ESTATE = {
+  name: 'Yarimawa Hills Estate',
+  location: 'Opposite Janguza Langel, Kano',
+  title: 'Letter of Grant issued by Kano State Ministry of Land and Physical Planning',
+  plans: [
+    { size: '50 x 50', price: 4000000, deposit: 400000, monthly: 200000 },
+    { size: '25 x 50', price: 2000000, deposit: 200000, monthly: 100000 },
+  ],
+  duration: 18,
+  features: ['Good Road Network', 'Mosque & Islamiyyah', 'Nursery School', 'Clinic', 'Shopping Area', 'Recreational Area', 'Secure & Serene Environment', 'Ideal for Families'],
+};
+
 const QUICK_HIGHLIGHTS = [
   { icon: Globe, label: 'Work From Anywhere' },
   { icon: FolderOpen, label: 'Access Active Projects' },
@@ -89,6 +103,7 @@ const BENEFITS = [
 ];
 
 const FAQS = [
+  { q: 'Which estate am I selling right now?', a: 'Yarimawa Hills Estate Private Layout, opposite Janguza Langel, Kano — 50x50 plots at ₦4,000,000 and 25x50 plots at ₦2,000,000, both on an 18-month Easy-Buy plan, with a Letter of Grant from the Kano State Ministry of Land and Physical Planning.' },
   { q: 'Do I need to visit your office?', a: 'No. You can register online and operate as an agent from wherever you are.' },
   { q: 'Who can become an agent?', a: 'Individuals, marketers, property consultants, businesses and other eligible people can apply.' },
   { q: 'How much is the commission?', a: `Commission is a percentage of the qualifying customer's initial deposit, set per plot type by the Chairman — for example, on a plan with a ₦${EXAMPLE_DEPOSIT.toLocaleString()} deposit, ${EXAMPLE_RATE * 100}% works out to ₦${EXAMPLE_COMMISSION.toLocaleString()}.` },
@@ -171,11 +186,14 @@ export default function BecomeAnAgentPage() {
       {/* 1. HERO */}
       <section className="bg-white">
         <div className="max-w-md mx-auto sm:max-w-2xl lg:max-w-4xl px-4 sm:px-6 lg:px-8 pt-10 pb-8 text-center">
+          <span className="inline-flex items-center gap-1.5 bg-[var(--color-primary-light)] text-[var(--color-primary)] text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full mb-4">
+            <MapPin className="w-3.5 h-3.5" /> Now Selling: {FEATURED_ESTATE.name}, Kano
+          </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-[1.1] mb-4 tracking-tight">
             Become an <span className="text-[var(--color-primary)]">M.I. Real Estate</span> Agent
           </h1>
           <p className="text-gray-500 text-base sm:text-lg max-w-lg mx-auto mb-7">
-            Promote our properties from anywhere and earn <strong className="text-gray-900">{EXAMPLE_RATE * 100}% commission</strong> when your referred customer successfully starts a plot payment.
+            Sell plots at <strong className="text-gray-900">{FEATURED_ESTATE.name} Private Layout</strong>, opposite Janguza Langel, Kano — from ₦2,000,000 with {FEATURED_ESTATE.duration}-month Easy-Buy — and earn <strong className="text-gray-900">{EXAMPLE_RATE * 100}% commission</strong> on your customer&apos;s initial deposit. Registration is free.
           </p>
           <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto mb-2 text-left">
             {QUICK_HIGHLIGHTS.map(h => (
@@ -187,26 +205,24 @@ export default function BecomeAnAgentPage() {
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="relative w-full max-w-2xl mx-auto aspect-[4/5] sm:aspect-[4/3] rounded-3xl overflow-hidden shadow-xl">
+        <div className="px-4 sm:px-6 lg:px-8 pb-8">
+          <div className="relative w-full max-w-lg mx-auto aspect-[2/3] rounded-3xl overflow-hidden shadow-xl border border-gray-100 bg-gray-50">
             <Image
-              src="/images/become-agent-hero.jpg"
-              alt="M.I. Real Estate Agent"
+              src="/images/yarimawa-hills-flyer.jpg"
+              alt={`${FEATURED_ESTATE.name} Private Layout, ${FEATURED_ESTATE.location} — 50x50 plot ₦4,000,000, 25x50 plot ₦2,000,000, 18-month Easy-Buy`}
               fill
               priority
-              className="object-cover object-top"
+              sizes="(max-width: 640px) 100vw, 512px"
+              className="object-contain"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-primary-dark)]/80 via-black/10 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button onClick={scrollToForm} className="flex-1 bg-white text-[var(--color-primary-dark)] font-bold py-3.5 px-6 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all inline-flex items-center justify-center gap-2">
-                  Become an Agent <ArrowRight className="w-4 h-4" />
-                </button>
-                <button onClick={scrollToHowItWorks} className="flex-1 bg-white/10 backdrop-blur-sm text-white font-bold py-3.5 px-6 rounded-xl border border-white/40 hover:bg-white/20 transition-all inline-flex items-center justify-center gap-2">
-                  <Play className="w-4 h-4" /> How It Works
-                </button>
-              </div>
-            </div>
+          </div>
+          <div className="max-w-lg mx-auto flex flex-col sm:flex-row gap-3 mt-5">
+            <button onClick={scrollToForm} className="btn-primary flex-1 py-3.5 px-6 inline-flex items-center justify-center gap-2">
+              Create Agent Account <ArrowRight className="w-4 h-4" />
+            </button>
+            <button onClick={scrollToHowItWorks} className="flex-1 bg-white text-[var(--color-primary-dark)] font-bold py-3.5 px-6 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all inline-flex items-center justify-center gap-2">
+              <Play className="w-4 h-4" /> How It Works
+            </button>
           </div>
         </div>
 
@@ -234,17 +250,24 @@ export default function BecomeAnAgentPage() {
           <p className="text-gray-500 mb-8">When you refer a customer who is verified, approved and successfully pays the initial deposit to start their plot payment.</p>
 
           <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 sm:p-8 mb-4">
-            <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-4">Example</p>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-semibold text-gray-600">Customer Initial Deposit</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-gray-900">₦{EXAMPLE_DEPOSIT.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-600">Agent Commission ({EXAMPLE_RATE * 100}%)</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-[var(--color-primary)]">₦{EXAMPLE_COMMISSION.toLocaleString()}</span>
+            <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-4">Example — {FEATURED_ESTATE.name}</p>
+            <div className="space-y-5">
+              {FEATURED_ESTATE.plans.map(plan => (
+                <div key={plan.size} className="border-b border-amber-200/70 last:border-0 pb-5 last:pb-0">
+                  <p className="text-sm font-extrabold text-gray-900 mb-2">{plan.size} Plot</p>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-semibold text-gray-600">Customer Initial Deposit</span>
+                    <span className="text-lg sm:text-xl font-extrabold text-gray-900">₦{plan.deposit.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-600">Agent Commission ({EXAMPLE_RATE * 100}%)</span>
+                    <span className="text-lg sm:text-xl font-extrabold text-[var(--color-primary)]">₦{(plan.deposit * EXAMPLE_RATE).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <p className="text-xs text-gray-400 mb-6">Example only, based on one of our current plot plans. Actual commission is set per plot type and is subject to customer verification, Chairman approval and confirmation of the customer&apos;s successful initial payment.</p>
+          <p className="text-xs text-gray-400 mb-6">Example only, based on the current Yarimawa Hills Easy-Buy deposits. Actual commission is set per plot type and is subject to customer verification, Chairman approval and confirmation of the customer&apos;s successful initial payment.</p>
 
           <div className="bg-amber-100/60 rounded-2xl px-5 py-4 flex items-start gap-3 mb-8">
             <span className="text-lg leading-none">💡</span>
@@ -259,6 +282,48 @@ export default function BecomeAnAgentPage() {
             <p className="text-gray-500 italic max-w-sm mx-auto">&ldquo;Together we build people, communities and better futures.&rdquo;</p>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mt-2">M.I. Real Estate</p>
           </div>
+        </div>
+      </section>
+
+      {/* FEATURED ESTATE — matches current advert flyer */}
+      <section className="bg-[var(--color-primary-dark)] py-14 md:py-20 px-4 sm:px-6 lg:px-8 text-white">
+        <div className="max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl">
+          <span className="inline-block bg-white/10 text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border border-white/20 mb-4">What You&apos;ll Be Selling</span>
+          <h2 className="text-3xl md:text-4xl font-extrabold mb-2">{FEATURED_ESTATE.name} Private Layout</h2>
+          <p className="text-white/80 flex items-center gap-1.5 mb-8"><MapPin className="w-4 h-4" /> {FEATURED_ESTATE.location}</p>
+
+          <div className="grid sm:grid-cols-2 gap-4 mb-6">
+            {FEATURED_ESTATE.plans.map(plan => (
+              <div key={plan.size} className="bg-white text-gray-900 rounded-3xl p-6">
+                <p className="text-sm font-bold text-[var(--color-primary)] uppercase tracking-wide">{plan.size} Plot</p>
+                <p className="text-3xl font-extrabold mb-4">₦{plan.price.toLocaleString()}</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Payment Plan (Easy-Buy)</p>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-500">Initial Deposit</span><span className="font-bold">₦{plan.deposit.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Monthly Payment</span><span className="font-bold">₦{plan.monthly.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Duration</span><span className="font-bold">{FEATURED_ESTATE.duration} Months</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white/10 border border-white/20 rounded-2xl px-5 py-4 flex items-start gap-3 mb-8">
+            <FileText className="w-5 h-5 shrink-0 mt-0.5" />
+            <p className="text-sm"><strong>Title document:</strong> {FEATURED_ESTATE.title}.</p>
+          </div>
+
+          <p className="text-xs font-bold uppercase tracking-wide text-white/70 mb-3">Estate Features</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-10">
+            {FEATURED_ESTATE.features.map(f => (
+              <div key={f} className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-[var(--color-gold)] shrink-0" /> {f}
+              </div>
+            ))}
+          </div>
+
+          <button onClick={scrollToForm} className="bg-white text-[var(--color-primary-dark)] font-bold py-3.5 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all w-full sm:w-auto inline-flex items-center justify-center gap-2">
+            Start Selling — Create Agent Account <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </section>
 
@@ -545,7 +610,7 @@ export default function BecomeAnAgentPage() {
             <div className="absolute inset-0 bg-[var(--color-primary-dark)]/85" />
             <div className="relative z-10 p-8 sm:p-10 text-center">
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3">Ready to Become an M.I. Real Estate Agent?</h2>
-              <p className="text-white/85 max-w-md mx-auto mb-7 text-sm sm:text-base">Create your account online and start connecting customers to quality real estate opportunities.</p>
+              <p className="text-white/85 max-w-md mx-auto mb-7 text-sm sm:text-base">Create your free account online and start connecting customers to plots at Yarimawa Hills Estate, Kano — invest today for a better tomorrow.</p>
               <button onClick={scrollToForm} className="bg-white text-[var(--color-primary-dark)] font-bold py-3.5 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all">
                 Become an Agent
               </button>
