@@ -226,7 +226,7 @@ export default function BecomeAnAgentClient({ content }: { content: AgentPageCon
             <div className="space-y-5">
               {examplePlans.map((plan, i) => (
                 <div key={i} className="border-b border-amber-200/70 last:border-0 pb-5 last:pb-0">
-                  <p className="text-sm font-extrabold text-gray-900 mb-2">{plan.size} Plot</p>
+                  <p className="text-sm font-extrabold text-gray-900 mb-2">{plan.size} Plot{plan.price > 0 && ` — ₦${plan.price.toLocaleString()}`}</p>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm font-semibold text-gray-600">Customer Initial Deposit</span>
                     <span className="text-lg sm:text-xl font-extrabold text-gray-900">₦{plan.deposit.toLocaleString()}</span>
