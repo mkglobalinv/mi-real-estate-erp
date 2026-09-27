@@ -124,7 +124,7 @@ const Footer = () => {
                 className="bg-black/40 hover:bg-black/60 border border-white/10 text-gray-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest transition-all flex items-center gap-1.5 mt-2 md:mt-0"
               >
                 <Laptop className="w-3 h-3" />
-                Website By ReciprocalTech
+                Click To Contact Developer
               </Link>
             </div>
           </div>
