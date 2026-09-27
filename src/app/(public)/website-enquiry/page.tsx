@@ -16,18 +16,37 @@ export default function WebsiteEnquiryPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  const RECIPROCALTECH_EMAIL = 'reciprocaltech@gmail.com';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
+    // Saving to website_enquiries is best-effort only — the anon insert
+    // has no RLS policy in production, so it reliably fails there. The
+    // actual delivery to ReciprocalTech is the mailto link below, which
+    // doesn't depend on our database at all.
     try {
       await api.submitWebsiteEnquiry(formData);
-      setIsSuccess(true);
     } catch (error) {
-      alert('Failed to submit enquiry. Please try again later.');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Failed to save website enquiry:', error);
     }
+
+    const subject = `Website Enquiry from ${formData.name}${formData.company ? ` (${formData.company})` : ''}`;
+    const body = [
+      `Name: ${formData.name}`,
+      `Phone: ${formData.phone}`,
+      `Email: ${formData.email}`,
+      `Company: ${formData.company}`,
+      `Business Type: ${formData.businessType}`,
+      '',
+      'Project Description:',
+      formData.description,
+    ].join('\n');
+    window.location.href = `mailto:${RECIPROCALTECH_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    setIsSuccess(true);
+    setIsSubmitting(false);
   };
 
   return (
@@ -51,9 +70,15 @@ export default function WebsiteEnquiryPage() {
               <div className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-8">
                 <CheckCircle className="w-12 h-12" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank you for your enquiry.</h2>
-              <p className="text-lg text-gray-600 mb-8">
-                Our team at Reciprocal Technologies will contact you shortly to discuss your project requirements.
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">Almost there!</h2>
+              <p className="text-lg text-gray-600 mb-2">
+                Your email app should have opened with your details pre-filled — just hit send.
+              </p>
+              <p className="text-sm text-gray-500 mb-8">
+                If it didn&apos;t open, email us directly at{' '}
+                <a href={`mailto:${RECIPROCALTECH_EMAIL}`} className="text-[var(--color-primary)] font-semibold hover:underline">
+                  {RECIPROCALTECH_EMAIL}
+                </a>.
               </p>
               <button 
                 onClick={() => { setIsSuccess(false); setFormData({name: '', phone: '', email: '', company: '', businessType: '', description: ''}); }}
