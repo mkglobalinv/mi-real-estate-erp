@@ -27,8 +27,8 @@ interface PlotPlan {
 }
 
 const PLOT_PLANS: PlotPlan[] = [
-  { id: '25x50', label: '25 × 50 ft Plot', size: '25 × 50 ft', total: 1950000, deposit: 150000, monthly: 75000, months: 24 },
   { id: '50x50', label: '50 × 50 ft Plot', size: '50 × 50 ft', total: 3900000, deposit: 300000, monthly: 150000, months: 24 },
+  { id: '25x50', label: '25 × 50 ft Plot', size: '25 × 50 ft', total: 1950000, deposit: 150000, monthly: 75000, months: 24 },
 ];
 
 const TRUST_INDICATORS = [
