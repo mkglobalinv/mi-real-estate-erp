@@ -16,6 +16,7 @@ const Navbar = () => {
     { name: 'Home', path: '/' },
     { name: 'About Us', path: '/about' },
     { name: 'Properties', path: '/properties' },
+    { name: 'Lambu Estate', path: '/lambu-estate' },
     { name: 'Easy Buy', path: '/easy-buy' },
     { name: 'Contact', path: '/contact' },
   ];
