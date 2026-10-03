@@ -8,6 +8,7 @@ import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://mirealestat.com'),
   title: "M.I. Real Estate & General Enterprises Ltd",
   description: "Premium corporate and residential real estate in Nigeria. Future-ready CRM & Property Management Platform.",
 };
